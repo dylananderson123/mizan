@@ -1,33 +1,45 @@
-// Progression layer. Decides when each mechanic appears.
-// A "level" is a short group of three puzzles, so the player climbs quickly.
-// Levels 1 to 3 are handcrafted. 4 to 9 come from fixed seeds
-// (tools/build-levels.mjs). 10 to 12 are named so the architecture has a
-// place for them; they are sealed.
+// Progression layer. Decides which level exists and when it opens.
 //
-// The array is still called CHAPTERS inside the code: one level here is what
-// the first build called a chapter.
+// Rewritten 1 Oct 2026 `[Dylan]`: the first five levels are no longer five
+// versions of one square. Each asks for a different kind of thinking:
+//
+//   1 The Square          CALCULATE   fill a square so every line balances
+//   2 The Broken Square   DETECT      find the one wrong stone from the totals
+//   3 Restoration         OPTIMIZE    undo a swap, as many swaps as you like
+//   4 The Magic Triangle  GENERALIZE  no grid: three sides must agree
+//   5 The Hidden Rule     DISCOVER    infer the rule from finished examples
+//
+// Every level is a puzzle definition (src/puzzles/definitions.js). A square is
+// played on the original carved board through `toLegacySpec`; the others
+// carry their own definition, which the node board plays.
+//
+// The array is still called CHAPTERS: a level here is what the first build
+// called a chapter. Each has exactly one puzzle for now, and the code already
+// handles several.
 
-import { CHAPTER_1 } from './chapter1.js';
-import { GENERATED } from './levels.data.js';
+import { LEVELS } from '../puzzles/definitions.js';
+import { toLegacySpec, isSquareDef } from '../puzzles/legacy.js';
 
-const pick = (...ids) => ids.map((id) => CHAPTER_1.find((p) => p.id === id));
+const THETA = { m1: 45, m2: 54, m3: 60, m4: 50, m5: 58 }; // contact angle of each frame's pattern
+
+const chapterOf = (def, i) => ({
+  id: `l${i + 1}`,
+  num: i + 1,
+  title: def.title,
+  skill: def.skill,
+  intro: def.intro ?? def.blurb,
+  theta: THETA[def.id] ?? 45,
+  reward: def.reward,
+  def,
+  puzzles: [isSquareDef(def) ? toLegacySpec(def) : def],
+});
 
 export const CHAPTERS = [
-  { id: 'l1', num: 1, title: 'Fifteen', theta: 45, puzzles: pick('c1-01', 'c1-02', 'c1-03') },
-  { id: 'l2', num: 2, title: 'Crossing Lines', theta: 54, puzzles: pick('c1-04', 'c1-05', 'c1-07') },
-  { id: 'l3', num: 3, title: 'The First Square', theta: 60, puzzles: pick('c1-08', 'c1-09', 'c1-10') },
-  { id: 'l4', num: 4, title: 'Other Numbers', theta: 50, puzzles: GENERATED.l4 },
-  { id: 'l5', num: 5, title: 'Thirty Four', theta: 58, puzzles: GENERATED.l5 },
-  { id: 'l6', num: 6, title: 'The Broken Square', theta: 48, puzzles: GENERATED.l6 },
-  { id: 'l7', num: 7, title: 'Spare Stones', theta: 62, puzzles: GENERATED.l7 },
-  { id: 'l8', num: 8, title: 'Sixteen Stones', theta: 52, puzzles: GENERATED.l8 },
-  { id: 'l9', num: 9, title: 'The Deep Square', theta: 56, puzzles: GENERATED.l9 },
-  { id: 'l10', num: 10, title: 'Other Rules', sealed: true, puzzles: [] },
-  { id: 'l11', num: 11, title: 'Beyond the Edge', sealed: true, puzzles: [] },
-  { id: 'l12', num: 12, title: 'New Forms', sealed: true, puzzles: [] },
+  ...LEVELS.map(chapterOf),
+  { id: 'l6', num: 6, title: 'Further forms', sealed: true, puzzles: [] },
 ];
 
-// The first level that uses 1..9 in full. Daily Square opens after it.
+// Daily Square opens after this level is complete.
 export const DAILY_AFTER = 'l3';
 // Endless 4x4 opens when this level opens.
 export const FOUR_AT = 'l5';
@@ -50,18 +62,20 @@ export function nextLevel(id) {
   return next && !next.sealed ? next.puzzles[0] : null;
 }
 
-// A level opens when the one before it is complete.
-export function chapterOpen(chapter, completed) {
+// A level is open when the save lists it as unlocked, or when the one before
+// it is complete. (The save's list is what makes "unlocked" survive on its
+// own; the second test is the rule it was written from.)
+export function chapterOpen(chapter, completed, unlocked = []) {
   const i = CHAPTERS.indexOf(chapter);
   if (chapter.sealed) return false;
-  if (i === 0) return true;
+  if (i === 0 || unlocked.includes(chapter.id)) return true;
   return CHAPTERS[i - 1].puzzles.every((p) => completed[p.id]);
 }
 
 // Inside an open level, a puzzle opens when the one before it is done.
-export function levelOpen(id, completed) {
+export function levelOpen(id, completed, unlocked = []) {
   const at = findLevel(id);
-  if (!at || !chapterOpen(at.chapter, completed)) return false;
+  if (!at || !chapterOpen(at.chapter, completed, unlocked)) return false;
   return at.index === 0 || Boolean(completed[at.chapter.puzzles[at.index - 1].id]);
 }
 

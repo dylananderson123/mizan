@@ -23,6 +23,7 @@
   --turquoise: #5f8f8b;
   --terracotta: #8f452b;
   --brass: #8c6b2f;
+  --brass-text: #76591f;   /* brass for small text: 5.2:1 on paper, where --brass is 4.1:1 */
   --brass-light: #b99652;
   --timber: #3a291d;
   --pattern-ghost: rgba(91, 71, 51, 0.13);
@@ -32,7 +33,7 @@
 
   --text-scale: 1;
   --font: 'Readex Pro', 'Segoe UI', system-ui, -apple-system, sans-serif;
-  --board: min(92vw, calc(100svh - 330px), 540px);
+  --board: min(92vw, calc(100svh - 392px), 540px);
   --ease-settle: cubic-bezier(0.2, 0.9, 0.25, 1.12);
   --ease-out: cubic-bezier(0.2, 0.7, 0.2, 1);
   color-scheme: light;
@@ -127,7 +128,7 @@ button:focus-visible, input:focus-visible, .socket-hit:focus-visible {
 .title { font-weight: 300; font-size: clamp(2rem, 8vw, 3.2rem); letter-spacing: 0.08em; margin: 0; color: var(--ink); }
 .sub { margin: 0 0 28px; color: var(--ink-soft); font-weight: 300; letter-spacing: 0.05em; }
 .menu-nav { display: flex; flex-direction: column; gap: 12px; align-items: center; }
-.corner { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 12px; }
+.corner { position: absolute; top: max(12px, env(safe-area-inset-top)); right: 12px; display: flex; align-items: center; gap: 2px; }
 
 /* -------------------------------------------------------------- journey */
 
@@ -143,19 +144,20 @@ button:focus-visible, input:focus-visible, .socket-hit:focus-visible {
 .numeral { margin: 0; font-size: 0.74rem; letter-spacing: 0.18em; text-transform: uppercase; color: var(--ink-soft); }
 .chapter h3 { margin: 2px 0 8px; font-weight: 400; font-size: 1.15rem; letter-spacing: 0.02em; }
 .sealed-note { margin: 0; font-size: 0.85rem; color: var(--ink-soft); }
-.levels { display: flex; flex-wrap: wrap; gap: 6px; }
+.levels { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
 .lvl {
-  width: 34px; height: 34px; border-radius: 50%; border: 1px solid rgba(var(--shadow), 0.3);
-  background: transparent; cursor: pointer; font-size: 0.8rem; color: var(--ink-soft);
-  display: grid; place-items: center;
+  box-sizing: border-box; width: 36px; height: 36px; margin: 0; padding: 0; border-radius: 50%;
+  border: 1.5px solid rgba(var(--shadow), 0.3); background: transparent; cursor: pointer;
+  font-size: 0.82rem; line-height: 1; color: var(--ink-soft);
+  display: grid; place-items: center; position: relative; isolation: isolate;
 }
 .lvl.next { border-color: var(--brass); border-width: 2px; color: var(--ink); }
-.lvl.done { border: 0; color: var(--ink); background: none; position: relative; }
+/* a finished puzzle is the game's own eight-point star, same size as the rest */
+.lvl.done { border-color: transparent; background: none; color: var(--ink); font-weight: 500; }
 .lvl.done::before {
   content: ''; position: absolute; inset: -3px; z-index: -1; background: var(--brass-light);
-  clip-path: polygon(50% 0%, 61.5% 22.3%, 85.4% 14.6%, 77.7% 38.5%, 100% 50%, 77.7% 61.5%, 85.4% 85.4%, 61.5% 77.7%, 50% 100%, 38.5% 77.7%, 14.6% 85.4%, 22.3% 61.5%, 0% 50%, 22.3% 38.5%, 14.6% 14.6%, 38.5% 22.3%);
+  clip-path: polygon(50.0% 0.0%, 63.8% 16.7%, 85.4% 14.6%, 83.3% 36.2%, 100.0% 50.0%, 83.3% 63.8%, 85.4% 85.4%, 63.8% 83.3%, 50.0% 100.0%, 36.2% 83.3%, 14.6% 85.4%, 16.7% 63.8%, 0.0% 50.0%, 16.7% 36.2%, 14.6% 14.6%, 36.2% 16.7%);
 }
-.lvl { isolation: isolate; }
 .lvl:disabled { opacity: 0.4; cursor: default; }
 
 /* -------------------------------------------------------------- endless */
@@ -321,7 +323,8 @@ html.lh .actions { justify-content: flex-start; flex-direction: row-reverse; }
 .tier-dots i { width: 5px; height: 5px; border-radius: 50%; border: 1px solid var(--brass); }
 .tier-dots i.on { background: var(--brass); }
 
-.done { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 14px; animation: rise 0.9s var(--ease-out) both; }
+/* scoped: the Journey's finished-puzzle stars are also class .done */
+.play > .done { display: flex; flex-direction: column; align-items: center; gap: 4px; margin-top: 14px; padding: 12px 26px 14px; border-radius: 8px; background: rgba(246, 239, 220, 0.94); box-shadow: 0 6px 22px -8px rgba(var(--shadow), 0.45); animation: rise 0.9s var(--ease-out) both; }
 .done-word { margin: 0; font-size: 1.5rem; font-weight: 300; letter-spacing: 0.1em; }
 .done-line { margin: 0; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .done-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
@@ -379,30 +382,24 @@ html.lh .speech::after { right: auto; left: -7px; box-shadow: -1px 1px 0 0 rgba(
 
 /* --------------------------------------------------------------- reward */
 
-/* A band of pattern light that travels outward from the board across the
-   whole wall. The band is a moving ring in a mask. */
-@property --r { syntax: '<length>'; inherits: false; initial-value: 0px; }
-.bloom {
-  /* z-index 0: on the wall, behind the board and the words (#app is 1) */
-  position: fixed; inset: 0; pointer-events: none; z-index: 0;
-  -webkit-mask-image: radial-gradient(circle at var(--cx) var(--cy), transparent calc(var(--r) - 22vmax), #000 calc(var(--r) - 9vmax), #000 calc(var(--r) - 2vmax), transparent var(--r));
-  mask-image: radial-gradient(circle at var(--cx) var(--cy), transparent calc(var(--r) - 22vmax), #000 calc(var(--r) - 9vmax), #000 calc(var(--r) - 2vmax), transparent var(--r));
-  animation: bloom-out 4.2s cubic-bezier(0.3, 0.45, 0.45, 1) both;
-}
-.bloom svg { width: 100%; height: 100%; }
-.bloom path { fill: none; stroke-width: 0.22; stroke-linecap: round; }
-.bloom.brass path { stroke: var(--brass); }
-.bloom.indigo path { stroke: var(--indigo); stroke-width: 0.2; }
-.bloom::before {
-  content: ''; position: absolute; inset: 0;
-  background: radial-gradient(circle at var(--cx) var(--cy), rgba(255, 246, 222, 0) 0, rgba(255, 246, 222, 0.5) 60%, rgba(255, 246, 222, 0) 100%);
-}
-@keyframes bloom-out {
-  0% { --r: 0px; opacity: 0; }
-  12% { opacity: 1; }
-  70% { opacity: 0.85; }
-  100% { --r: 115vmax; opacity: 0; }
-}
+/* The wall bursts into colour: a patchwork of tile rosettes pops out from
+   the board, ring by ring, holds, then fades. It sits on the wall, behind
+   the board and the words, above the level's backdrop. */
+.burst { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; animation: burst-life var(--life, 6s) linear both; }
+.burst svg { display: block; width: 100%; height: 100%; }
+/* the pattern's own shapes are coloured in, ring by ring; nothing moves or grows */
+.burst .ring { animation: fill-in 0.9s ease-out var(--d, 0s) both; }
+.burst .weave { animation: fill-in 0.6s ease-out both; opacity: 0.55; }
+.burst.still .ring { animation-delay: 0s; }
+@keyframes fill-in { from { opacity: 0; } }
+@keyframes burst-life { 0%, 78% { opacity: 0.9; } 100% { opacity: 0; } }
+
+/* The frame itself takes colour: rows red, columns blue, the rest orange. */
+.frame.resolving .pat-line { opacity: 1; stroke-width: 0.34; }
+.frame.resolving .pat-line[data-line^="r"] { stroke: #a8141f; }
+.frame.resolving .pat-line[data-line^="c"] { stroke: #2f86d9; }
+.frame.resolving .pat-line:not([data-line^="r"]):not([data-line^="c"]) { stroke: #e58f3a; }
+.frame.resolving .border { stroke: #1d2733; }
 
 /* A breeze: fine dust carried across the screen, left to right. */
 .breeze { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
@@ -434,26 +431,52 @@ html.lh .speech::after { right: auto; left: -7px; box-shadow: -1px 1px 0 0 rgba(
 .interlude { position: fixed; inset: 0; z-index: 40; background: var(--limestone); }
 .il-scene { position: absolute; inset: 0; }
 .il-scene canvas { display: block; width: 100%; height: 100%; }
-.il-caption {
-  position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(28px, env(safe-area-inset-bottom));
-  color: var(--chalk); text-shadow: 0 1px 8px rgba(38, 30, 22, 0.45); pointer-events: none;
-  animation: rise 1.4s var(--ease-out) 0.9s both;
+.il-card {
+  position: absolute; left: 50%; bottom: max(24px, env(safe-area-inset-bottom));
+  width: min(520px, calc(100% - 32px)); box-sizing: border-box; padding: 22px 24px 24px;
+  display: flex; flex-direction: column; align-items: center; gap: 8px; text-align: center;
+  background: rgba(230, 220, 200, 0.94); border: 1px solid var(--limestone-2); border-radius: 18px;
+  box-shadow: 0 10px 30px -12px rgba(38, 30, 22, 0.5);
+  opacity: 0; transform: translate(-50%, 8px); pointer-events: none;
+  transition: opacity 2.4s ease-in-out, transform 2.8s ease-in-out;
 }
-.il-place { margin: 0; font-weight: 300; font-size: 1.6rem; letter-spacing: 0.08em; }
-.il-sub { margin: 2px 0 0; font-size: 0.78rem; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.9; }
-.il-skip {
+.interlude.ready .il-card { opacity: 1; transform: translate(-50%, 0); pointer-events: auto; }
+.il-title { margin: 0; font-weight: 300; font-size: clamp(1.6rem, 6vw, 2.4rem); letter-spacing: 0.06em; color: var(--ink); }
+.il-intro { margin: 0 0 8px; max-width: 42ch; line-height: 1.5; color: var(--ink-soft); }
+.interlude.leaving { opacity: 0; transition: opacity 0.4s var(--ease-out); pointer-events: none; }
+
+/* The setting of a level: the scene that played before it, one still frame,
+   washed pale so the board and the numbers stay the loudest thing. */
+.backdrop { position: fixed; inset: 0; z-index: -1; opacity: 0; transition: opacity 1.4s var(--ease-out); pointer-events: none; }
+.backdrop.in { opacity: 1; }
+.backdrop canvas { display: block; width: 100%; height: 100%; }
+.backdrop::after { content: ''; position: absolute; inset: 0; background: rgba(236, 227, 209, 0.22); }
+.hc .backdrop { display: none; }
+
+/* -------------------------------------------------------------- opening */
+
+.opening { position: fixed; inset: 0; z-index: 60; background: #141a2e; display: flex; align-items: center; justify-content: center; }
+/* Phones are narrower than the film (9:16), so it fills the screen. Anything wider keeps the whole picture. */
+.op-video { width: 100%; height: 100%; object-fit: cover; display: block; }
+@media (min-aspect-ratio: 9/16) { .op-video { object-fit: contain; } }
+.op-skip {
   position: absolute; top: max(14px, env(safe-area-inset-top)); right: 14px; min-height: 44px; padding: 0 18px;
-  border: 1px solid rgba(244, 239, 228, 0.5); border-radius: 22px; background: rgba(38, 30, 22, 0.25);
+  border: 1px solid rgba(244, 239, 228, 0.5); border-radius: 22px; background: rgba(20, 26, 46, 0.35);
   color: var(--chalk); letter-spacing: 0.08em; cursor: pointer;
 }
-.il-card {
-  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
-  background: var(--limestone); opacity: 0; pointer-events: none; transition: opacity 0.6s var(--ease-out);
+.op-tap {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); min-height: 56px; padding: 0 34px;
+  border: 1px solid rgba(244, 239, 228, 0.6); border-radius: 28px; background: rgba(20, 26, 46, 0.55);
+  color: var(--chalk); font-size: 1.1rem; letter-spacing: 0.1em; cursor: pointer;
 }
-.il-title { margin: 0; font-weight: 300; font-size: clamp(1.6rem, 6vw, 2.4rem); letter-spacing: 0.06em; color: var(--ink); }
-.interlude.carding .il-card { opacity: 1; }
-.interlude.carding .il-skip, .interlude.carding .il-caption { display: none; }
-.interlude.leaving { opacity: 0; transition: opacity 0.8s var(--ease-out); pointer-events: none; }
+.op-tap[hidden] { display: none; }
+/* the four start buttons, laid over the film's last frame */
+.op-nav {
+  position: absolute; left: 0; right: 0; bottom: max(7vh, calc(env(safe-area-inset-bottom) + 24px));
+}
+/* one button per tap of sound: each rises in at its own beat (--at, set in app.js) */
+.op-nav > .btn { animation: rise 0.5s var(--ease-out) var(--at, 0s) both; }
+.opening.leaving { opacity: 0; transition: opacity 0.8s var(--ease-out); pointer-events: none; }
 
 /* ------------------------------------------------------------- settings */
 
@@ -493,6 +516,267 @@ html.rm *, html.rm *::before, html.rm *::after { animation-duration: 0.001s !imp
 }
 @media (max-height: 640px) {
   .sheikh { width: 62px; height: 75px; }
-  .speech { min-height: 72px; padding: 6px 12px 8px; }
+  .speech { padding: 6px 12px 8px; }
   .goal { width: 2.8rem; height: 2.8rem; }
+}
+
+/* Phones. The guide box is a fixed height so the board does not jump when
+   the sheikh's words change, and the finished panel is small and sits at the
+   bottom of the screen, so Continue is never below the fold. */
+@media (max-width: 699px) {
+  .screen { padding-top: max(6px, env(safe-area-inset-top)); padding-bottom: max(10px, env(safe-area-inset-bottom)); }
+  /* The guide keeps the room for the goal and three lines of words (measured: the
+     longest hint on Levels 2 and 4 is 149 px) so the board never moves when they
+     change. The speech panel inside it is only as tall as its words, so the
+     empty tan under a short line is gone. */
+  .guide { min-height: 150px; }
+  .speech { min-height: 0; background: rgba(250, 248, 242, 0.9); box-shadow: 0 0 0 1px rgba(var(--shadow), 0.1), 0 8px 18px -12px rgba(var(--shadow), 0.45); }
+  /* Empty places read as cool stone, not more tan, so they stand apart from the
+     carved stones (warm) and the loose stones (ivory). */
+  .frame { --recess-top: #a9b0ba; --recess-mid: #b8bfc8; --recess-bottom: #c6ccd3; }
+  .frame .socket { stroke: rgba(52, 64, 107, 0.22); }
+  .frame .panel { fill: #ece5d6; }
+  .say-lead { font-size: 0.92rem; }
+  .say-text { font-size: 0.88rem; line-height: 1.3; }
+  .play > .done {
+    position: sticky; bottom: max(10px, env(safe-area-inset-bottom)); z-index: 5;
+    box-sizing: border-box; width: var(--board); margin-top: 6px; padding: 8px 12px 10px; gap: 2px;
+  }
+  .done .seal { width: 26px; height: 26px; }
+  .done-word { font-size: 1.2rem; }
+  .done-line { font-size: 0.88rem; }
+  .done-actions { width: 100%; flex-wrap: nowrap; margin-top: 6px; }
+  .done-actions .btn { min-width: 0; min-height: 46px; flex: 1; padding: 8px 10px; }
+}
+.play:has(.board.resolved) .tray { display: none; }
+
+/* While the burst plays, the words and buttons sit on solid paper so the colour never muddies them. */
+.play:has(.burst) .speech { background: #f8f3e6; }
+.play:has(.burst) .bar .icon { background: rgba(246, 239, 220, 0.92); }
+
+
+/* ---------------------------------------------------------------- coins */
+
+.bar-right { display: flex; align-items: center; gap: 2px; }
+.coin-chip {
+  display: flex; align-items: center; gap: 6px; height: 32px; padding: 0 12px 0 6px; border-radius: 16px;
+  background: rgba(255, 252, 245, 0.7); box-shadow: 0 0 0 1px rgba(var(--shadow), 0.16);
+  font-size: 0.9rem; font-weight: 500; color: var(--ink); font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0.02em;
+}
+.coin-glyph { width: 20px; height: 20px; flex: none; }
+.coin-disc { fill: var(--brass-light); stroke: var(--brass); stroke-width: 0.9; }
+.coin-rim { fill: none; stroke: rgba(255, 255, 255, 0.55); stroke-width: 0.6; }
+.coin-star { fill: var(--brass); fill-opacity: 0.85; stroke: none; }
+.coin-chip.pulse { animation: coin-pulse 0.55s var(--ease-out); }
+@keyframes coin-pulse { 35% { transform: scale(1.1); box-shadow: 0 0 0 1px var(--brass), 0 0 14px rgba(185, 150, 82, 0.55); } }
+
+/* The reward on the finished panel: a coin and an amount, then the coin leaves for the counter. */
+.reward { display: flex; align-items: center; gap: 8px; margin-top: 8px; opacity: 0; transform: scale(0.85); }
+.reward.in { animation: reward-in 0.6s var(--ease-settle) forwards; }
+.reward .coin-glyph.big { width: 32px; height: 32px; transition: opacity 0.3s; filter: drop-shadow(0 2px 3px rgba(var(--shadow), 0.3)); }
+.reward.paid .coin-glyph.big { opacity: 0.2; }
+.reward-amt { font-size: 1.5rem; font-weight: 500; color: var(--brass-text); font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0.02em; }
+@keyframes reward-in { to { opacity: 1; transform: none; } }
+.reward-note { margin: 8px 0 0; font-size: 0.8rem; color: var(--ink-soft); letter-spacing: 0.06em; }
+.coin-fly { position: fixed; z-index: 80; width: 24px; height: 24px; pointer-events: none; will-change: transform; }
+.coin-fly .coin-glyph { width: 100%; height: 100%; filter: drop-shadow(0 2px 3px rgba(var(--shadow), 0.35)); }
+
+/* Journey cards: a level with one puzzle has one button, a blurb and its reward. */
+.ch-blurb { margin: 0 0 8px; font-size: 0.86rem; line-height: 1.35; color: var(--ink-soft); }
+.ch-meta { margin: 0 0 10px; display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; font-size: 0.8rem; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
+.ch-reward { display: inline-flex; align-items: center; gap: 4px; color: var(--brass-text); font-weight: 500; }
+.ch-reward .coin-glyph { width: 16px; height: 16px; }
+.ch-done { letter-spacing: 0.04em; }
+.btn.go { min-width: 140px; min-height: 44px; padding: 8px 22px; }
+.btn.small { min-width: 0; min-height: 40px; padding: 6px 14px; font-size: 0.85rem; }
+.chapter.sealed .sealed-note { max-width: 24ch; }
+
+/* The swap you may spend (Level 3). */
+.swap-label { margin-left: 6px; font-size: 0.8rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-soft); }
+
+/* ----------------------------------------------------- triangle and ring */
+
+.board.nodes .tile .num { font-size: calc(var(--board) * 0.06); }
+.board.nodes .ghost { font-size: calc(var(--board) * 0.055); }
+.frame .decor { fill: none; stroke: rgba(var(--shadow), 0.22); stroke-width: 0.3; stroke-linejoin: round; transition: stroke 1.2s; }
+.frame .decor.hub { stroke: rgba(var(--shadow), 0.16); }
+.frame.resolving .decor { stroke: var(--pattern-whole); stroke-opacity: 0.55; }
+/* what was there all along draws itself: chords through the ring's centre, sides of the triangle */
+.frame .chord {
+  fill: none; stroke: var(--brass); stroke-width: 0.55; stroke-linecap: round;
+  stroke-dasharray: 1 1; stroke-dashoffset: 1; animation: draw-chord 1.1s var(--ease-out) calc(0.8s + var(--i, 0) * 0.35s) forwards;
+}
+.frame .chord.side { stroke: var(--pattern-whole); stroke-width: 0.7; stroke-opacity: 0.7; }
+@keyframes draw-chord { to { stroke-dashoffset: 0; } }
+
+/* the three finished rings above the Level 5 board */
+.play.hidden-rule { --board: min(92vw, max(240px, calc(100svh - 520px)), 540px); }
+.examples { display: flex; gap: 8px; width: var(--board); margin-bottom: 8px; }
+.ex { position: relative; flex: 1; min-width: 0; margin: 0; aspect-ratio: 1; --exw: calc((var(--board) - 16px) / 3); }
+.ex-svg { position: absolute; inset: 0; width: 100%; height: 100%; overflow: visible; }
+.ex-bg { fill: var(--bone); stroke: rgba(var(--shadow), 0.2); stroke-width: 0.7; }
+.ex-ring { fill: none; stroke: rgba(var(--shadow), 0.18); stroke-width: 0.5; }
+.ex-chord { fill: none; stroke: var(--brass); stroke-width: 0.9; stroke-linecap: round; stroke-dasharray: 1 1; stroke-dashoffset: 1; opacity: 0; }
+.examples.revealed .ex-chord { opacity: 1; animation: draw-chord 1s var(--ease-out) calc(0.8s + var(--i, 0) * 0.35s) forwards; }
+.ex-tile {
+  position: absolute; width: 23%; height: 23%; display: grid; place-items: center; border-radius: 14%;
+  background: linear-gradient(165deg, #d9caab, #cfbd99);
+  box-shadow: 0 1px 2px rgba(var(--shadow), 0.35) inset, 0 -1px 0 rgba(255, 255, 255, 0.45) inset;
+}
+.ex-num { font-size: calc(var(--exw) * 0.12); font-weight: 500; color: var(--umber); font-variant-numeric: tabular-nums lining-nums; line-height: 1; }
+@media (min-width: 700px) { .play.hidden-rule { --board: min(max(260px, calc(100svh - 520px)), 540px); } }
+
+/* developer tools, only with ?dev in the address */
+.dev { margin-top: 12px; padding-top: 4px; border-top: 1px dashed rgba(var(--shadow), 0.3); }
+.dev .label { margin: 8px 0 0; }
+.dev-btns { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+
+.dlg-actions .btn.quiet { white-space: nowrap; min-width: 0; padding: 12px 8px; }
+
+/* The finished panel stays in reach on the tall boards, and shrinks on short phones so the reveal stays visible. */
+.play.hidden-rule > .done, .play.magic-triangle > .done { position: sticky; bottom: 10px; z-index: 5; }
+@media (max-width: 699px) and (max-height: 740px) {
+  .play:has(.board.resolved) .done-line { display: none; }
+}
+
+/* ------------------------------------------------------------ wide screens
+   Landscape phones, tablets and desktops. The portrait column leaves a 256 px
+   board on a laptop and no board at all on a phone held sideways, so when the
+   window is wider than it is tall the play screen becomes two columns: the
+   guide, stones and buttons on the left, the board as large as the height
+   allows on the right. Every child of .play is still a direct child, so the
+   portrait rules and the tests are unchanged. Kept last so it wins ties. */
+@media (min-aspect-ratio: 11/10) and (min-width: 560px) {
+  .screen.play { max-width: 1180px; --side: min(380px, 38vw); }
+  .play, .play.hidden-rule, .play.magic-triangle {
+    --board: min(calc(100svh - 92px), calc(100vw - var(--side) - 96px), 840px);
+    display: grid; width: 100%; gap: 0 32px; justify-content: center; align-content: start; align-items: start;
+    grid-template-columns: var(--side) var(--board);
+    grid-template-rows: auto auto auto auto auto auto 1fr;
+    grid-template-areas: "bar bar" "guide board" "ex board" "tray board" "actions board" "done board" "rest board";
+  }
+  .play > .bar { grid-area: bar; }
+  .play > .guide { grid-area: guide; width: 100%; margin: 0 0 8px; }
+  .play > .stage { display: contents; }
+  .play .examples { grid-area: ex; width: 100%; margin-bottom: 8px; }
+  .play .stage > .board { grid-area: board; }
+  .play > .tray, .play > .swaps { grid-area: tray; width: 100%; box-sizing: border-box; max-width: none; }
+  .play > .actions { grid-area: actions; width: 100%; justify-content: flex-start; }
+  html.lh .play > .actions { justify-content: flex-end; }
+  .play > .done { grid-area: done; position: static; width: 100%; box-sizing: border-box; margin-top: 8px; }
+  .speech { min-height: 156px; } /* measured longest 155 px. The stones sit under it and must not move when the words change */
+  .sheikh { width: 80px; height: 97px; }
+  /* a short landscape phone: tighter guide, smaller sheikh */
+}
+@media (min-aspect-ratio: 11/10) and (min-width: 560px) and (max-height: 460px) {
+  .sheikh { width: 56px; height: 68px; }
+  .speech { padding: 5px 10px 6px; min-height: 136px; } /* measured longest 135 px */
+  .goal { width: 2.4rem; height: 2.4rem; }
+  .goal b { font-size: 1.1rem; }
+  .say-lead { font-size: 0.85rem; }
+  .say-text { font-size: 0.8rem; margin-top: 2px; }
+  .inscription { font-size: 0.64rem; }
+  .act { min-height: 44px; }
+  .play > .actions { margin-top: 6px; }
+  .play > .tray { margin-top: 4px; }
+}
+
+/* The back and settings buttons sit on a pale disc, so they read on the dark
+   arch and the sea in the level scenes as well as on the plain paper. */
+.play .bar .icon { background: rgba(246, 239, 220, 0.78); box-shadow: 0 1px 2px rgba(var(--shadow), 0.18); }
+.play .bar .icon:hover { background: rgba(246, 239, 220, 0.95); }
+
+/* Very narrow phones (320 px): the guide gives the words the room, the star
+   and the sheikh shrink, so the goal never wraps one word to a line. */
+@media (max-width: 359px) {
+  .guide { width: min(92vw, 540px); }
+  .sheikh { width: 56px; height: 68px; }
+  .speech { padding: 8px 10px 9px; }
+  .say-goal { grid-template-columns: minmax(0, 1fr) auto; gap: 6px; }
+  .goal { width: 2.6rem; height: 2.6rem; }
+  .goal b { font-size: 1.1rem; }
+}
+/* Once a swap puzzle is whole the count of swaps is no use, and its label is
+   hard to read over the burst. */
+.play:has(.board.resolved) .swaps { visibility: hidden; }
+
+/* Portrait: the board shrinks on a short screen, the words do not. */
+@media not all and (min-aspect-ratio: 11/10) { .guide { width: min(92vw, 540px); } }
+
+/* A line that comes out wrong shivers once, a pixel or two, and stops. */
+.marker.nudge { animation: nudge 0.42s var(--ease-out); }
+@keyframes nudge { 0%, 100% { transform: none; } 20% { transform: translateX(-1.4px); } 45% { transform: translateX(1.2px); } 70% { transform: translateX(-0.6px); } }
+
+/* ------------------------------------------------------------ stone sets
+   The one use of coins: how the movable stones look. Only the face changes,
+   never the size or the number, so no set is easier to read than another
+   (all numerals are at least 7:1 against their stone). Plain ivory is the
+   default; high contrast turns every set off. */
+html[data-stones="lapis"]:not(.hc) .tile:not(.locked) .face,
+.swatch[data-set="lapis"] {
+  background:
+    radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.26), transparent 55%),
+    linear-gradient(165deg, #4b63a9 0%, #3a4f8e 55%, #2d3d72 100%);
+}
+html[data-stones="basalt"]:not(.hc) .tile:not(.locked) .face,
+.swatch[data-set="basalt"] {
+  background:
+    radial-gradient(120% 90% at 30% 20%, rgba(255, 255, 255, 0.2), transparent 55%),
+    linear-gradient(165deg, #6a645a 0%, #524d45 55%, #403c36 100%);
+}
+html[data-stones="lapis"]:not(.hc) .tile:not(.locked) .face,
+html[data-stones="basalt"]:not(.hc) .tile:not(.locked) .face {
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.32) inset, 0 -2px 0 rgba(0, 0, 0, 0.22) inset, 0 1px 1px rgba(var(--shadow), 0.25), 0 4px 8px -3px rgba(var(--shadow), 0.45);
+}
+html[data-stones="lapis"]:not(.hc) .tile:not(.locked) .num,
+html[data-stones="basalt"]:not(.hc) .tile:not(.locked) .num { color: #f8f1de; }
+/* the indigo selection ring would vanish on blue stone */
+html[data-stones="lapis"]:not(.hc) .tile.selected .face,
+html[data-stones="basalt"]:not(.hc) .tile.selected .face { box-shadow: 0 0 0 2px var(--brass-light), 0 0 0 4px rgba(246, 239, 220, 0.8), 0 8px 14px -6px rgba(var(--shadow), 0.4); }
+html[data-stones="lapis"]:not(.hc) .tile.hinted .face,
+html[data-stones="basalt"]:not(.hc) .tile.hinted .face { box-shadow: 0 0 0 2px var(--brass-light), 0 0 0 4px rgba(246, 239, 220, 0.8), 0 4px 8px -3px rgba(var(--shadow), 0.32); }
+
+.swatch {
+  flex: none; width: 36px; height: 36px; border-radius: 13%; display: grid; place-items: center;
+  font-size: 1rem; font-weight: 500; font-variant-numeric: tabular-nums lining-nums; color: #f8f1de;
+  background: linear-gradient(165deg, #faf6ec 0%, #efe6d3 55%, #e3d6bb 100%);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.5) inset, 0 -2px 0 rgba(0, 0, 0, 0.12) inset, 0 3px 6px -3px rgba(var(--shadow), 0.4);
+}
+.swatch[data-set="ivory"] { color: var(--ink); }
+.swatch.big { width: 48px; height: 48px; font-size: 1.3rem; }
+
+.stones-row {
+  width: 100%; max-width: 640px; margin: 4px 0 12px; padding: 8px 14px; min-height: 52px;
+  display: flex; align-items: center; gap: 12px; text-align: left; cursor: pointer;
+  background: rgba(255, 252, 245, 0.6); border: 1px solid rgba(var(--shadow), 0.16); border-radius: 4px;
+}
+.stones-row:hover { background: rgba(255, 252, 245, 0.9); }
+.stones-text { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
+.stones-text b { font-weight: 500; font-size: 0.98rem; letter-spacing: 0.02em; }
+.stones-text small { color: var(--ink-soft); font-size: 0.82rem; }
+.stones-row .coin-glyph.small { width: 20px; height: 20px; }
+.stone-balance { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; color: var(--brass-text); font-weight: 500; }
+.stone-balance .coin-glyph { width: 22px; height: 22px; }
+.stone-list { display: flex; flex-direction: column; }
+.stone-opt { display: flex; align-items: center; gap: 12px; min-height: 64px; padding: 8px 0; border-bottom: 1px solid rgba(var(--shadow), 0.1); }
+.stone-opt .btn.small { min-width: 96px; min-height: 44px; padding: 6px 12px; flex: none; }
+.stone-note { margin: 10px 0 0; color: var(--ink-soft); font-size: 0.86rem; min-height: 2.4em; }
+
+.journey-end { text-align: center; padding: 22px 16px 28px; margin-top: 4px; border-top: 1px solid rgba(var(--shadow), 0.16); }
+.journey-end h3 { margin: 4px 0 6px; font-weight: 300; font-size: 1.25rem; letter-spacing: 0.06em; }
+.journey-end .ch-blurb { margin: 0; }
+
+/* Hover, for a mouse only (a finger has no hover). A stone you can move rises
+   a little; a space you can drop on lights when a stone is in hand; the
+   Undo and Hint buttons lift like the other buttons. Quiet on purpose. */
+@media (hover: hover) {
+  .tile:not(.locked):not(.selected):not(.lifted):not(.dragging):hover .face {
+    transform: translateY(-2px);
+    box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 -2px 0 rgba(var(--shadow), 0.1) inset, 0 6px 12px -5px rgba(var(--shadow), 0.42);
+  }
+  .board:has(.tile.selected) .socket-hit:hover,
+  .board:has(.tile.lifted) .socket-hit:hover { box-shadow: 0 0 0 2px var(--brass) inset; background: rgba(255, 255, 255, 0.22); }
+  .act:hover:not(:disabled) { transform: translateY(-1px); background: #fff; box-shadow: 0 4px 10px -4px rgba(var(--shadow), 0.3); }
+  .act:active:not(:disabled) { transform: none; }
+  .act { transition: transform 0.15s var(--ease-out), box-shadow 0.15s, background 0.15s; }
 }

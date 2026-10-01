@@ -12,7 +12,11 @@
 //   rule: 'sum',
 //   givens: { '4': 5 },         locked tiles, carved into the board
 //   pool: [1, 2, ..],           movable tiles
-//   start: { '0': 8 } | undefined   restore only: where movable tiles begin
+//   start: { '0': 8 } | undefined   where movable tiles begin. A restore puzzle
+//                                   places every pool tile; a fill puzzle may
+//                                   place some (a finished-looking square to
+//                                   repair) and leave the rest in the tray
+//   limit: 1 | undefined            most swaps the player may make (restore)
 //   meta: { title, inscription, band }
 // }
 
@@ -46,15 +50,19 @@ function validateSpec(p) {
   }
   const all = [...Object.values(p.givens), ...p.pool];
   if (new Set(all).size !== all.length) throw new Error(`${p.id}: duplicate tile values`);
+  const start = p.start ?? {};
   if (p.kind === 'restore') {
-    const start = p.start ?? {};
     const placed = Object.values(start).sort((a, b) => a - b);
     const pool = [...p.pool].sort((a, b) => a - b);
     if (placed.join() !== pool.join()) throw new Error(`${p.id}: restore start must place every pool tile`);
-    for (const c of Object.keys(start)) {
-      if (!present.has(+c) || p.givens[+c] !== undefined) throw new Error(`${p.id}: bad start cell ${c}`);
-    }
+  } else {
+    const inPool = new Set(p.pool);
+    for (const v of Object.values(start)) if (!inPool.has(v)) throw new Error(`${p.id}: start stone ${v} is not in the pool`);
   }
+  for (const c of Object.keys(start)) {
+    if (!present.has(+c) || p.givens[+c] !== undefined) throw new Error(`${p.id}: bad start cell ${c}`);
+  }
+  if (p.limit !== undefined && !(Number.isInteger(p.limit) && p.limit > 0)) throw new Error(`${p.id}: bad swap limit`);
 }
 
 export function serialize(p) {
@@ -71,6 +79,7 @@ export function serialize(p) {
   if (p.cells) out.cells = [...p.cells];
   if (p.lines) out.lines = [...p.lines];
   if (p.start) out.start = { ...p.start };
+  if (p.limit) out.limit = p.limit;
   if (p.meta) out.meta = { ...p.meta };
   return JSON.parse(JSON.stringify(out));
 }

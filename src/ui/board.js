@@ -9,10 +9,8 @@ import { sfx, haptic } from './sound.js';
 import { describeLine } from '../core/shape.js';
 import { cellName } from '../core/hints.js';
 
-const isBroken = (l) => l.status === 'wrong' || l.status === 'strained';
-
 export class BoardView {
-  constructor({ session, theta = 45, settings, onMove, onSolved, announce }) {
+  constructor({ session, theta = 45, settings, onMove, onSolved, onBlocked, announce }) {
     this.s = session;
     this.p = session.p;
     this.n = this.p.n;
@@ -20,8 +18,9 @@ export class BoardView {
     this.settings = settings;
     this.onMove = onMove;
     this.onSolved = onSolved;
+    this.onBlocked = onBlocked;
     this.announce = announce;
-    this.L = boardLayout(this.n);
+    this.L = this.layout();
     this.present = new Set(this.p.shape.cells);
     this.lineIds = this.p.shape.lines.map((l) => l.id);
     this.selected = null;
@@ -31,9 +30,18 @@ export class BoardView {
     this.tileEls = new Map();
     this.drag = null;
     this.keyBuffer = '';
+    this.trayCap = this.s.trayTiles().length;
     this.build();
     this.render();
   }
+
+  // The seams a board of another geometry overrides (nodeboard.js).
+  layout() { return boardLayout(this.n); }
+  boardLabel() { return `Magic square board, ${this.n} by ${this.n}. Every line must total ${this.p.target}.`; }
+  nodeName(c) { return cellName(this.n, c); }
+  lineName(id) { return describeLine(this.n, id); }
+  arcPct(l) { return Math.max(0, Math.min(100, (l.total / this.p.target) * 100)); }
+  trayTileMax() { return (this.el.getBoundingClientRect().width * this.L.s * 0.85) / 100; }
 
   get reduced() {
     return this.settings.reducedMotion || window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -42,10 +50,43 @@ export class BoardView {
   // ---------------------------------------------------------------- build
 
   build() {
-    const { n, s: cs, F } = this.L;
-    this.el = h('div', { class: `board n${n}`, role: 'group', 'aria-label': `Magic square board, ${n} by ${n}. Every line must total ${this.p.target}.` });
+    const { n } = this.L;
+    this.el = h('div', { class: `board n${n}`, role: 'group', 'aria-label': this.boardLabel() });
     if (this.p.kind === 'restore') this.el.classList.add('restore');
+    this.buildFrame();
 
+    // Sockets for input and screen readers, tiles above them.
+    this.socketLayer = h('div', { class: 'sockets' });
+    this.socketEls = new Map();
+    for (const c of this.p.shape.cells) {
+      const b = h('button', { class: 'socket-hit', 'data-cell': c, style: this.cellStyle(c) });
+      b.addEventListener('click', () => this.onSocketTap(c));
+      b.addEventListener('pointerenter', () => this.setRelated(c));
+      b.addEventListener('pointerleave', () => this.setRelated(null));
+      b.addEventListener('keydown', (e) => this.onSocketKey(e, c));
+      this.socketEls.set(c, b);
+      this.socketLayer.append(b);
+    }
+    this.ghostEl = h('div', { class: 'ghost', 'aria-hidden': 'true' });
+    this.tileLayer = h('div', { class: 'tiles' });
+    this.dust = h('div', { class: 'dust', 'aria-hidden': 'true' });
+    this.el.append(this.svg, this.socketLayer, this.ghostEl, this.tileLayer, this.dust);
+
+    this.tray = h('div', { class: 'tray', role: 'group', 'aria-label': 'Stones to place' });
+    this.tray.addEventListener('click', (e) => {
+      if (e.target === this.tray && this.selected && this.s.pos.get(this.selected) !== TRAY) this.tryMove(this.selected, TRAY);
+    });
+    if (this.p.kind === 'restore') this.tray.classList.add('hidden');
+
+    for (const t of this.s.tiles) this.tileEls.set(t.id, this.makeTile(t));
+
+    this.resizeObs = new ResizeObserver(() => this.sizeTray());
+    this.resizeObs.observe(this.el);
+  }
+
+  // The carved stone, its pattern and its borders: the part every board shares.
+  drawStone() {
+    const { n, F } = this.L;
     // The carved frame and its pattern.
     const groups = framePattern(n, this.theta);
     const allPattern = Object.values(groups).join('');
@@ -65,6 +106,11 @@ export class BoardView {
         s('stop', { offset: '0', style: 'stop-color: var(--recess-top)' }),
         s('stop', { offset: '0.35', style: 'stop-color: var(--recess-mid)' }),
         s('stop', { offset: '1', style: 'stop-color: var(--recess-bottom)' }))));
+  }
+
+  buildFrame() {
+    const { n, s: cs, F } = this.L;
+    this.drawStone();
     for (let c = 0; c < n * n; c++) {
       const x = this.L.cellX(c);
       const y = this.L.cellY(c);
@@ -110,34 +156,6 @@ export class BoardView {
       this.markers.set(id, { g: marker, ring, text });
       this.svg.append(marker);
     }
-
-    // Sockets for input and screen readers, tiles above them.
-    this.socketLayer = h('div', { class: 'sockets' });
-    this.socketEls = new Map();
-    for (const c of this.p.shape.cells) {
-      const b = h('button', { class: 'socket-hit', 'data-cell': c, style: this.cellStyle(c) });
-      b.addEventListener('click', () => this.onSocketTap(c));
-      b.addEventListener('pointerenter', () => this.setRelated(c));
-      b.addEventListener('pointerleave', () => this.setRelated(null));
-      b.addEventListener('keydown', (e) => this.onSocketKey(e, c));
-      this.socketEls.set(c, b);
-      this.socketLayer.append(b);
-    }
-    this.ghostEl = h('div', { class: 'ghost', 'aria-hidden': 'true' });
-    this.tileLayer = h('div', { class: 'tiles' });
-    this.dust = h('div', { class: 'dust', 'aria-hidden': 'true' });
-    this.el.append(this.svg, this.socketLayer, this.ghostEl, this.tileLayer, this.dust);
-
-    this.tray = h('div', { class: 'tray', role: 'group', 'aria-label': 'Stones to place' });
-    this.tray.addEventListener('click', (e) => {
-      if (e.target === this.tray && this.selected && this.s.pos.get(this.selected) !== TRAY) this.tryMove(this.selected, TRAY);
-    });
-    if (this.p.kind === 'restore') this.tray.classList.add('hidden');
-
-    for (const t of this.s.tiles) this.tileEls.set(t.id, this.makeTile(t));
-
-    this.resizeObs = new ResizeObserver(() => this.sizeTray());
-    this.resizeObs.observe(this.el);
   }
 
   destroy() {
@@ -198,10 +216,17 @@ export class BoardView {
   }
 
   sizeTray() {
-    const w = this.el.getBoundingClientRect().width;
-    if (!w) return;
-    const cellPx = (w * this.L.s * 0.85) / 100;
-    const count = this.s.tiles.filter((t) => !t.locked).length;
+    const boardW = this.el.getBoundingClientRect().width;
+    if (!boardW) return;
+    // The stones are sized to the room the tray really has: on a phone it is a
+    // little under the board's width, on a wide screen much less. Sizing to the
+    // board left five stones wrapping four and one.
+    const room = this.tray.clientWidth - 20;
+    const w = room > 0 ? Math.min(room, boardW) : boardW;
+    const cellPx = this.trayTileMax();
+    // Sized for the tray as it started, so the board does not jump about; it
+    // grows only if more stones come back to it than it began with.
+    const count = Math.max(this.trayCap, this.s.trayTiles().length);
     const perRow = count > 5 ? Math.ceil(count / 2) : Math.max(count, 1);
     const gap = Math.max(6, w * 0.018);
     const fit = (w - gap * (perRow - 1)) / perRow;
@@ -209,7 +234,7 @@ export class BoardView {
     this.tray.style.setProperty('--tray-tile', `${size}px`);
     this.tray.style.setProperty('--tray-gap', `${gap}px`);
     this.tray.style.minHeight = `${(count > 5 ? 2 : 1) * size + (count > 5 ? gap : 0) + 4}px`;
-    this.el.style.setProperty('--board-px', `${w}px`);
+    this.el.style.setProperty('--board-px', `${boardW}px`);
   }
 
   // --------------------------------------------------------------- render
@@ -231,7 +256,7 @@ export class BoardView {
         el.classList.remove('in-tray');
         if (this.drag?.el === el && this.drag.tx) el.style.transform = this.drag.tx;
         if (el.parentNode !== this.tileLayer) this.tileLayer.append(el);
-        el.setAttribute('aria-label', `Stone ${t.value}, ${this.n === 3 ? cellName(3, where) : cellName(this.n, where)}${t.locked ? ', fixed' : ''}`);
+        el.setAttribute('aria-label', `Stone ${t.value}, ${this.nodeName(where)}${t.locked ? ', fixed' : ''}`);
       }
       el.classList.toggle('selected', this.selected === t.id);
       if (!t.locked) el.setAttribute('aria-pressed', String(this.selected === t.id));
@@ -251,8 +276,7 @@ export class BoardView {
     for (const l of ev.lines) {
       const m = this.markers.get(l.id);
       m.g.setAttribute('class', `marker m-${l.status}`);
-      const pct = Math.max(0, Math.min(100, (l.total / this.p.target) * 100));
-      m.ring.style.strokeDasharray = `${pct} 100`;
+      m.ring.style.strokeDasharray = `${this.arcPct(l)} 100`;
       m.text.textContent = l.filled ? String(l.total) : '';
       const pat = this.svg.querySelector(`.pat-line[data-line="${l.id}"]`);
       if (pat) pat.classList.toggle('lit', l.status === 'exact');
@@ -265,8 +289,8 @@ export class BoardView {
     for (const [c, b] of this.socketEls) {
       const t = sess.tileAt(c);
       const through = ev.lines.filter((l) => this.p.shape.lines.find((L) => L.id === l.id).cells.includes(c))
-        .map((l) => `${describeLine(this.n, l.id)} ${l.total} of ${this.p.target}${l.status === 'exact' ? ', complete' : ''}`);
-      b.setAttribute('aria-label', `${cellName(this.n, c)}, ${vals[c] ? `holds ${vals[c]}${t?.locked ? ', fixed' : ''}` : 'empty'}. ${through.join('. ')}.`);
+        .map((l) => `${this.lineName(l.id)} ${l.total}${this.p.target ? ` of ${this.p.target}` : ''}${l.status === 'exact' ? ', complete' : ''}`);
+      b.setAttribute('aria-label', `${this.nodeName(c)}, ${vals[c] ? `holds ${vals[c]}${t?.locked ? ', fixed' : ''}` : 'empty'}. ${through.join('. ')}.`);
       b.classList.toggle('over', this.dragOver === c);
       b.classList.toggle('hl', hl.has(c));
     }
@@ -403,6 +427,14 @@ export class BoardView {
   }
 
   onTileTap(id) {
+    // Swaps spent: say so, and drop any stone in hand, so a stale choice
+    // cannot swap itself in later.
+    if (this.s.atLimit() && !this.s.solved) {
+      this.selected = null;
+      this.onBlocked?.('limit');
+      this.render();
+      return;
+    }
     const where = this.s.pos.get(id);
     if (this.selected && this.selected !== id && where !== TRAY) {
       if (this.tryMove(this.selected, where)) return;
@@ -524,7 +556,11 @@ export class BoardView {
   tryMove(id, dest) {
     const before = this.captureRects();
     const res = this.s.move(id, dest);
-    if (!res) return false;
+    if (!res) {
+      // A puzzle with a swap limit refuses more swaps once they are spent.
+      if (this.s.atLimit() && typeof dest === 'number') { this.selected = null; this.onBlocked?.('limit'); this.render(); }
+      return false;
+    }
     for (const el of this.tileEls.values()) el.style.transform = '';
     this.selected = null;
     this.hint = null;
@@ -546,8 +582,24 @@ export class BoardView {
       setTimeout(() => m.g.classList.remove('locking'), 900);
     }, 180 + k * 140));
     if (locked.length) haptic([6, 40, 6], this.settings.haptics);
-    const broke = res.after.lines.some((l, i) => isBroken(l) && !isBroken(res.before.lines[i]));
-    if (broke) setTimeout(() => sfx.strain(), 160);
+    // The error sound is only for a line that is full and wrong. A line that
+    // is still being built, even one that can no longer work, stays silent.
+    const wrongNow = res.after.lines.filter((l, i) => l.status === 'wrong' && res.before.lines[i].status !== 'wrong');
+    if (wrongNow.length) {
+      setTimeout(() => {
+        sfx.strain();
+        // One small sideways shiver on the broken marker, then still. It is a
+        // sign, not a punishment: the stone can be moved for free.
+        for (const l of wrongNow) {
+          const m = this.markers.get(l.id);
+          if (!m) continue;
+          m.g.classList.remove('nudge');
+          void m.g.getBoundingClientRect();
+          m.g.classList.add('nudge');
+          setTimeout(() => m.g.classList.remove('nudge'), 500);
+        }
+      }, 160);
+    }
 
     this.announce(this.describeMove(res));
     this.onMove?.(res);
@@ -556,14 +608,14 @@ export class BoardView {
   }
 
   describeMove(res) {
-    const where = res.dest === TRAY ? 'returned to the tray' : `placed in ${cellName(this.n, res.dest)}`;
+    const where = res.dest === TRAY ? 'returned to the tray' : `placed in ${this.nodeName(res.dest)}`;
     const parts = [res.other ? `${res.tile.value} swapped with ${res.other.value}.` : `${res.tile.value} ${where}.`];
     const changed = [res.from, res.dest].filter((x) => typeof x === 'number');
     for (const l of res.after.lines) {
       const L = this.p.shape.lines.find((x) => x.id === l.id);
       if (l.status === 'empty' || !changed.some((c) => L.cells.includes(c))) continue;
       const word = { exact: 'complete', wrong: 'does not make the target', strained: 'cannot reach the target', partial: 'so far', empty: '' }[l.status];
-      parts.push(`The ${describeLine(this.n, l.id)} totals ${l.total} of ${this.p.target}, ${word}.`);
+      parts.push(`The ${this.lineName(l.id)} totals ${l.total}${this.p.target ? ` of ${this.p.target}` : ''}, ${word}.`);
     }
     return parts.join(' ');
   }

@@ -28,5 +28,5 @@ export const CHAPTER_1 = [
   { ...base, id: 'c1-09', givens: { 0: 4, 1: 9, 8: 6 }, pool: [1, 2, 3, 5, 7, 8],
     meta: { inscription: 'The centre' } },
   { ...base, id: 'c1-10', givens: { 1: 9, 3: 3 }, pool: [1, 2, 4, 5, 6, 7, 8],
-    meta: { inscription: 'The first square' } },
+    meta: { inscription: 'Two marks' } },
 ];

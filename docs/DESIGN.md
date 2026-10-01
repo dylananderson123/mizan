@@ -76,30 +76,47 @@ Hints teach in three presses: where to look, what relationship holds, what follo
 
 ## 4. Progression
 
-Restructured 1 Oct 2026 `[Dylan]`: more levels, three puzzles each, so a player climbs fast; 4x4 much sooner; steeper difficulty. A "level" in the UI is what the code still calls a chapter (`CHAPTERS` in `src/game/levels.js`).
+**Rewritten 1 Oct 2026 `[Dylan]`: the five-level demo.** Nine levels of 3x3 and 4x4 squares felt like one idea. The Journey is now five levels that each ask for a different kind of thinking: CALCULATE, DETECT, OPTIMIZE, GENERALIZE, DISCOVER. A "level" in the UI is still what the code calls a chapter (`CHAPTERS` in `src/game/levels.js`). The old 27 puzzles are kept in `src/game/archive.js` and still tested.
 
-| Level | Puzzles | Teaches |
-|---|---|---|
-| 1 Fifteen | c1-01, c1-02, c1-03 | One line makes 15; columns; one stone serves two lines |
-| 2 Crossing Lines | c1-04, c1-05, c1-07 | Where lines cross both must agree; diagonals; the full square |
-| 3 The First Square | c1-08, c1-09, c1-10 | Fewer marks; the centre; the finale |
-| 4 Other Numbers | 3x3 Lucas, bands 1, 2, 3 | New numbers, a new total; three times the centre; one candidate left |
-| 5 Thirty Four | 4x4, 3 gaps, 5 gaps, 8 gaps | The board expands to 4x4 (puzzle 13; it was puzzle 22) |
-| 6 The Broken Square | restore 3x3 1 swap, 3x3 2 swaps, 4x4 1 swap | Swaps only |
-| 7 Spare Stones | 3x3 with 1 and 2 spare stones, 4x4 band 3 | Decide what belongs |
-| 8 Sixteen Stones | 4x4 band 3, 4x4 restore 2 swaps, 4x4 band 4 | Crossing lines on 4x4 |
-| 9 The Deep Square | 4x4 band 4, 4x4 restore 3 swaps, 4x4 band 5 | Suppose a stone and follow it |
-| 10 to 12 | sealed | Other Rules, Beyond the Edge, New Forms |
+| Level | Title | Thinking | The puzzle | Reward |
+|---|---|---|---|---|
+| 1 | The Square | Calculate | 3x3, 1 to 9 once, every row, column and diagonal 15. Four stones carved in | 10 |
+| 2 | The Broken Square | Detect | A finished-looking square on 5 to 13 (total 27) with one wrong stone, a 14 where a 10 belongs. Three lines read 31 and cross at that stone. Tray: 3, 10, 16. The engine finds the lines; the hint names the stone and its number | 15 |
+| 3 | Restoration | Optimize | All of 1 to 9 present, two traded places, exactly one swap allowed (`limit: 1`). One swap, and only one, repairs it; the other seven valid squares are all further away | 20 |
+| 4 | The Magic Triangle | Generalize | NRICH Magic Triangle: nine nodes, four to a side, corners shared. Sides must agree; no total is given. Three stones carved in; two arrangements remain (the middle pair of one side can swap), both accepted. Total 20 | 25 |
+| 5 | The Hidden Rule | Discover | Three finished rings of 1 to 8, then a fourth half empty. Nothing names the rule. The rule: stones across the ring make the same total (9). Solved: four chords draw through the centre into an eight-point star, on the board and on the three examples. The Lo Shu follows the same law (opposite cells make 10) | 30 |
 
-Cut: c1-06 "Opposites" (more than one answer is right). Its regression test keeps the spec inline.
+**Why the ring rule.** It is the associative property of the Lo Shu, seen on its own: the hidden structure beneath the first level. The test suite holds a list of other simple rules someone might guess (equal sums, differences or products at any step, arithmetic runs, alternating parity, opposites differing by 4, and so on); exactly one fits all three examples, so the discovery is fair. The unfinished ring has one completion and every gap has its partner already on the board. The rule is judged only when the ring is full, so no marker or colour names it.
 
-Between levels: a 7-second procedural film shot (`src/ui/scenes.js`), then the next level's name over its first puzzle. Scenes cycle in order: Nizwa, the Sea of Oman, a dhow, Stone Town, Wahiba Sands, Jebel Shams. Skip button and Escape end it early.
+### The puzzle kit (`src/puzzles/`)
 
-The guide: a sheikh in a carved niche, upper right of the play screen (`src/ui/sheikh.js`). His speech holds the goal number in an indigo eight-point star, the teaching line, every hint, and the praise at the end. Dress taken from Dylan's reference (pale mint thobe, white turban, white scarf with black and grey stripes, brown skin, short grey beard). The face is simple and is not a likeness of anyone.
+A puzzle is nodes, stones and constraints. `kit.js` knows three constraint types (SUM, EQUAL_SUM, ALL_DIFFERENT), reads a half-filled board honestly (empty, partial, strained, exact, wrong), and solves by search (used for verification and for hints). `definitions.js` writes the five puzzles in it. A new geometry is a new list of constraints, a layout (`geometry.js`) and, if the player's relation differs, one entry in `RULES`. The tests include a seven-node puzzle written with nothing but the kit. Squares are turned into the original spec (`legacy.js`) and play on the carved board unchanged; the triangle and ring play on `NodeBoardView`, a subclass of the same board, so stones, tray, drag, tap, keyboard, hints and the finish are one code path.
 
-The reward (`src/ui/reward.js`, `sfx.complete`, `sfx.level`): on top of the frame resolving, a band of the pattern travels out across the wall from the board, the stones lift one after another, a breeze of dust crosses the screen, a seal star draws itself. Sound adds a rising air swell and a plucked phrase on the hijaz set. A finished level adds a second indigo band and a short reed-flute line before a fuller chord.
+Not done, deliberately: Latin squares, hexagons, pyramids, modular and factor puzzles need only definitions plus a layout. Panmagic, product and antimagic need a new rule entry.
+
+### Coins (`src/game/economy.js`, `progress.js`, `src/ui/coins.js`)
+
+A reward has a key (`level:m1`). A key is paid once, ever; that one rule is the whole anti-farming guard, so replaying a level pays nothing and a better run only updates the best record. A mode that should pay again uses a key that changes (a date, a week). `spend` is built and tested but no screen calls it: hints, skins, themes, puzzle packs and artifact restoration can call it later without changing the wallet. Daily and Endless pay nothing in this demo.
+
+The counter sits in every top bar. On a first completion a coin and "+10" appear on the finished panel; then one coin per ten paid travels up to the counter, and each landing ticks the number. Reduced motion skips the travel. Best finish per level is kept (fewer hints, then fewer moves, then less time) and shown on the Journey.
+
+Save version 2 adds `unlocked`, `best` and `wallet`. A version 1 save keeps its settings and Daily record and starts level progress again. Reset: Settings has "Erase progress" (keeps settings); `?dev` adds Reset progress, Open all levels and +50 coins.
+
+(Old path) Cut: c1-06 "Opposites" (more than one answer is right). Its regression test keeps the spec inline.
+
+Between levels: a 7-second procedural film shot (`src/ui/scenes.js`), then the next level's name over its first puzzle. No place is named on screen `[Dylan]` 1 Oct 2026: the scenes are only inspired by Nizwa, the sea, a dhow, Stone Town, Wahiba Sands and Jebel Shams. The scene that plays before a level is also that level's setting: one still frame (the frame the film ends on) behind the play screen, lightly washed (`mountBackdrop` in `src/ui/app.js`, `sceneFor(num)`; Level 1 has none, high contrast hides it). Skip button and Escape end the film early.
+
+The guide: a sheikh in a carved niche, upper right of the play screen (`src/ui/sheikh.js`). His speech holds the goal number in an indigo eight-point star, the teaching line, every hint, and the praise at the end. Redrawn 1 Oct 2026 `[Dylan]` from a second reference: tall rounded white turban, light olive skin, short salt-and-pepper beard, royal-blue tunic with round neck, white undershirt edge and three cloth buttons. Only dress and colour were taken. The face is simple and is not a likeness of anyone.
+
+The reward (`src/ui/reward.js`, `sfx.complete`, `sfx.level`): when a square is whole, the pattern in the board's frame carries on across the whole wall in fine lines, and its own shapes are coloured in, ring by ring, outward from the board `[Dylan]` 1 Oct 2026. Nothing new appears: the stars in the tiles and the shapes round each corner take red, blue, orange, green and cream, the colours the frame's lines already take. The wall's tiles line up with the frame's tiles and use the level's own contact angle. It holds, then fades (6 s, 8 s for a finished level). The stones lift one after another, a breeze of dust crosses the screen, a seal star draws itself. Sound adds a rising air swell and a plucked phrase on the hijaz set. A finished level adds a short reed-flute line before a fuller chord. Reduced motion gets a plain fade-in. The first versions popped hundreds of new hexagons and circles onto the wall, and Dylan rejected that.
+
+The error sound (`sfx.strain`) plays only when a line is full and wrong `[Dylan]` 1 Oct 2026. A line that is still being built stays silent, even if it can no longer work.
 
 Each level has its own emblem on the Journey screen: the same 4.8.8 tiling at a different Hankin angle. One piece of the emblem inks in per level finished. The finished emblems are the "library of patterns" the brief asks for.
+
+Stones (1 Oct 2026, the one use of coins): `STONE_SETS` in `economy.js`. Ivory is free, Lapis 30, Basalt 60. A set changes only how the movable stones look. The two paid sets cost 90 and the five levels pay 100, so finishing the game once buys both. The Journey has a slim "Stones" row at the top that says what the next set costs and opens the dialog. Save fields `owned` and `stones`; a save that names a set it does not own falls back to Ivory. Prices are Claude's `[mine, unagreed]`.
+
+Wide layout (1 Oct 2026): when the window is wider than 1.1 times its height (landscape phones, tablets, laptops, desktops) the play screen is two columns, guide, stones and buttons on the left and the board, as tall as the screen allows, on the right. Every child of `.play` is still a direct child, so the portrait rules are untouched. It is the last block in `css/style.css`.
 
 Modes: **Journey** (above). **Daily Square** opens after Level 3: one moderate 3x3 on fresh numbers, the same for everyone on a given local date, with time, missteps, hints and a streak. **Endless**: 3x3, broken 3x3, or 4x4 (from Level 5), at a chosen depth. **Zen** is the default: there is no timer on screen unless switched on in settings.
 

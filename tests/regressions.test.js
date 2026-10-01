@@ -7,7 +7,7 @@ import { solveLogically, findSolutions } from '../src/core/solver.js';
 import { givenValues } from '../src/core/puzzle.js';
 import { migrate, freshSave } from '../src/game/storage.js';
 import { Session, TRAY } from '../src/game/session.js';
-import { CHAPTERS, findLevel } from '../src/game/levels.js';
+import { ARCHIVE, archiveFind as findLevel } from '../src/game/archive.js';
 import { endlessPuzzle, streakAlive } from '../src/game/daily.js';
 
 test('hints on deep 4x4 puzzles always end in a placement, and the placement is right', () => {
@@ -39,12 +39,12 @@ test('a clash between two stones blames the pair, not one innocent stone', () =>
 });
 
 test('the solver refuses an unknown technique cap', () => {
-  const p = hydrate(CHAPTERS[0].puzzles[0]);
+  const p = hydrate(ARCHIVE[0].puzzles[0]);
   assert.throws(() => solveLogically(p, { maxTechnique: 'place' }));
 });
 
 test('saves with bad fields fall back field by field', () => {
-  const m = migrate({ v: 1, daily: { records: null, streak: 'x', lastDate: 5 }, settings: { sound: 'yes', textScale: 9, haptics: false }, completed: 'nope', current: { spec: 1 } });
+  const m = migrate({ v: 2, daily: { records: null, streak: 'x', lastDate: 5 }, settings: { sound: 'yes', textScale: 9, haptics: false }, completed: 'nope', current: { spec: 1 } });
   assert.deepEqual(m.daily, freshSave().daily);
   assert.equal(m.settings.sound, true);
   assert.equal(m.settings.textScale, 1);
@@ -54,13 +54,13 @@ test('saves with bad fields fall back field by field', () => {
 });
 
 test('a saved stone in a space that does not exist is a corrupt save', () => {
-  const spec = findLevel('c1-07').spec;
+  const spec = findLevel('c1-07');
   const s = new Session(spec);
   const bad = { ...s.toJSON(), pos: { t9: 99 } };
   assert.throws(() => Session.fromJSON(bad));
   const nan = { ...s.toJSON(), pos: { t9: 'abc' } };
   assert.throws(() => Session.fromJSON(nan));
-  const r = new Session(findLevel('l6-01').spec);
+  const r = new Session(findLevel('l6-01'));
   const tray = { ...r.toJSON(), pos: { ...r.toJSON().pos, [r.tiles.find((t) => !t.locked).id]: TRAY } };
   assert.throws(() => Session.fromJSON(tray), 'restore stones never sit in the tray');
 });

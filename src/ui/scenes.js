@@ -997,7 +997,8 @@ const BUILD = {
 
 // ---------- mounting ----------
 
-export function mountScene(container, id, { reduced = false, duration = 7000, onEnd } = {}) {
+// still: draw one frame, no fades, no end. Used as the backdrop of a level.
+export function mountScene(container, id, { reduced = false, still = false, hold = false, duration = 7000, onEnd } = {}) {
   const build = BUILD[id] || BUILD.nizwa;
   const canvas = document.createElement('canvas');
   canvas.style.cssText = 'display:block;width:100%;height:100%';
@@ -1005,7 +1006,8 @@ export function mountScene(container, id, { reduced = false, duration = 7000, on
   container.appendChild(canvas);
   const ctx = canvas.getContext('2d');
   const fade = Math.min(800, duration / 3);
-  let S = null, draw = null, grain = null, raf = 0, timer = 0, start = 0, lastMs = duration / 2;
+  // a backdrop rests on the frame the film ends on, so the level opens where the scene stopped
+  let S = null, draw = null, grain = null, raf = 0, timer = 0, start = 0, lastMs = still ? duration : duration / 2;
   let stopped = false, ended = false;
 
   function setup() {
@@ -1027,7 +1029,7 @@ export function mountScene(container, id, { reduced = false, duration = 7000, on
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = grain; ctx.fillRect(0, 0, canvas.width, canvas.height);
     if (fades) {
-      const a = 1 - clamp(Math.min(ms / fade, (duration - ms) / fade));
+      const a = 1 - clamp(Math.min(ms / fade, hold ? Infinity : (duration - ms) / fade));
       if (a > 0) { ctx.globalAlpha = a; ctx.fillStyle = C.limestone; ctx.fillRect(0, 0, canvas.width, canvas.height); ctx.globalAlpha = 1; }
     }
   }
@@ -1042,23 +1044,25 @@ export function mountScene(container, id, { reduced = false, duration = 7000, on
     if (!start) start = now;
     lastMs = Math.min(duration, now - start);
     render(lastMs, true);
-    if (lastMs >= duration) finish();
+    if (lastMs >= duration) { if (hold) ended = true; else finish(); }
     else raf = requestAnimationFrame(tick);
   }
 
   setup();
   let ro = null;
-  const onResize = () => { if (!stopped && setup() && (reduced || ended)) render(lastMs, !reduced); };
+  const onResize = () => { if (!stopped && setup() && (reduced || still || ended)) render(lastMs, !(reduced || still)); };
   if (typeof ResizeObserver === 'function') { ro = new ResizeObserver(onResize); ro.observe(container); }
   else window.addEventListener('resize', onResize);
 
-  if (reduced) {
+  if (still) {
     render(lastMs, false);
-    timer = setTimeout(finish, duration);
+  } else if (reduced) {
+    render(lastMs, false);
+    if (!hold) timer = setTimeout(finish, duration);
   } else {
     render(0, true);
     raf = requestAnimationFrame(tick);
-    timer = setTimeout(finish, duration + 1500); // if frames are throttled, still end
+    if (!hold) timer = setTimeout(finish, duration + 1500); // if frames are throttled, still end
   }
 
   return {

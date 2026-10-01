@@ -88,6 +88,43 @@ export function hankin(poly, thetaDeg) {
   return segs;
 }
 
+// The coloured regions of one tile's Hankin pattern. Each tile splits into
+// one star (edge midpoints alternating with the ray meeting points) and one
+// kite at every corner. Returned as polygons; a kite also names its corner,
+// so the kites from the tiles that share a corner can be coloured as one.
+export function regions(poly, thetaDeg) {
+  const pts = poly.pts;
+  const n = pts.length;
+  const cx = pts.reduce((a, p) => a + p[0], 0) / n;
+  const cy = pts.reduce((a, p) => a + p[1], 0) / n;
+  const th = thetaDeg * D2R;
+  const edges = [];
+  for (let i = 0; i < n; i++) {
+    const a = pts[i];
+    const b = pts[(i + 1) % n];
+    const m = [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2];
+    const len = Math.hypot(b[0] - a[0], b[1] - a[1]);
+    const d = [(b[0] - a[0]) / len, (b[1] - a[1]) / len];
+    let nrm = [-d[1], d[0]];
+    if (nrm[0] * (cx - m[0]) + nrm[1] * (cy - m[1]) < 0) nrm = [-nrm[0], -nrm[1]];
+    edges.push({
+      m,
+      fwd: [Math.cos(th) * d[0] + Math.sin(th) * nrm[0], Math.cos(th) * d[1] + Math.sin(th) * nrm[1]],
+      back: [-Math.cos(th) * d[0] + Math.sin(th) * nrm[0], -Math.cos(th) * d[1] + Math.sin(th) * nrm[1]],
+    });
+  }
+  const meet = [];
+  for (let i = 0; i < n; i++) meet.push(intersect(edges[i].m, edges[i].fwd, edges[(i + 1) % n].m, edges[(i + 1) % n].back));
+  if (meet.some((m) => !m)) return null;
+  const star = [];
+  const kites = [];
+  for (let i = 0; i < n; i++) {
+    star.push(edges[i].m, meet[i]);
+    kites.push({ corner: pts[(i + 1) % n], pts: [pts[(i + 1) % n], edges[i].m, meet[i], edges[(i + 1) % n].m] });
+  }
+  return { star, kites };
+}
+
 export function toPath(segs) {
   let d = '';
   for (const [a, b, c, e] of segs) d += `M${a.toFixed(2)} ${b.toFixed(2)}L${c.toFixed(2)} ${e.toFixed(2)}`;

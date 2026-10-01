@@ -17,11 +17,12 @@ export class Session {
     for (const v of this.p.pool) this.tiles.push({ id: 't' + v, value: v, locked: false });
     this.pos = new Map();
     for (const t of this.tiles) this.pos.set(t.id, t.locked ? t.home : TRAY);
-    if (this.p.kind === 'restore') {
-      for (const [c, v] of Object.entries(this.p.start)) this.pos.set('t' + v, +c);
-    }
+    // Movable stones that begin on the board: all of them for a restore
+    // puzzle, some of them for a finished-looking square to repair.
+    for (const [c, v] of Object.entries(this.p.start ?? {})) this.pos.set('t' + v, +c);
     this.history = [];
     this.moves = 0;
+    this.tries = 0; // every move ever made, undone or not
     this.mistakes = 0;
     this.hints = 0;
     this.elapsed = 0;
@@ -59,6 +60,7 @@ export class Session {
   canMove(tileId, dest) {
     const t = this.tile(tileId);
     if (!t || t.locked || this.solved) return false;
+    if (this.atLimit()) return false;
     const from = this.pos.get(tileId);
     if (from === dest) return false;
     if (dest === TRAY) return this.p.kind !== 'restore' && from !== TRAY;
@@ -69,6 +71,11 @@ export class Session {
     return { tile: t, from, dest, other };
   }
 
+  // A puzzle can allow only so many swaps. Undo gives one back.
+  atLimit() {
+    return Boolean(this.p.limit) && this.moves >= this.p.limit;
+  }
+
   move(tileId, dest) {
     const m = this.canMove(tileId, dest);
     if (!m) return null;
@@ -77,6 +84,7 @@ export class Session {
     this.pos.set(tileId, dest);
     if (m.other) this.pos.set(m.other.id, m.from);
     this.moves++;
+    this.tries++;
     const after = this.evaluate();
     // A misstep: a line that could still work now cannot. Counted quietly,
     // only ever shown in the Daily Square summary.
@@ -98,6 +106,7 @@ export class Session {
       spec: serialize(this.p),
       pos: Object.fromEntries(this.pos),
       moves: this.moves,
+      tries: this.tries,
       mistakes: this.mistakes,
       hints: this.hints,
       elapsed: this.elapsed,
@@ -123,6 +132,7 @@ export class Session {
     const placed = [...this.pos.values()].filter((w) => w !== TRAY);
     if (new Set(placed).size !== placed.length) throw new Error('Corrupt save: two tiles in one cell');
     this.moves = saved.moves ?? 0;
+    this.tries = Math.max(saved.tries ?? 0, this.moves);
     this.mistakes = saved.mistakes ?? 0;
     this.hints = saved.hints ?? 0;
     this.elapsed = saved.elapsed ?? 0;
