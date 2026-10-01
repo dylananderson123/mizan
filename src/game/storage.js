@@ -1,7 +1,7 @@
 // Save state. One versioned JSON blob in localStorage. The storage object is
 // passed in so tests can use a fake one.
 
-export const SAVE_KEY = 'magic-square-game.save';
+export const SAVE_KEY = 'mizan.save';
 export const SAVE_VERSION = 1;
 
 export const DEFAULT_SETTINGS = {

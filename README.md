@@ -1,4 +1,4 @@
-# House of Zairajah (working title)
+# Mizan
 
 A calm puzzle game that begins with magic squares. Vertical slice, built 1 Oct 2026.
 
@@ -7,7 +7,7 @@ A calm puzzle game that begins with magic squares. Vertical slice, built 1 Oct 2
 It uses JavaScript modules, so it must be served, not opened as a file.
 
 ```bash
-cd ~/code/magic-square-game && python3 -m http.server 8963
+cd ~/code/mizan && python3 -m http.server 8963
 ```
 
 Then open http://127.0.0.1:8963 in Chrome.
@@ -15,7 +15,7 @@ Then open http://127.0.0.1:8963 in Chrome.
 ## Test it
 
 ```bash
-cd ~/code/magic-square-game && npm test
+cd ~/code/mizan && npm test
 ```
 
 42 tests. One of them enumerates all 7,040 normal 4x4 magic squares, so the suite takes a few seconds.
@@ -23,7 +23,7 @@ cd ~/code/magic-square-game && npm test
 ## Rebuild the seeded levels
 
 ```bash
-cd ~/code/magic-square-game && npm run levels
+cd ~/code/mizan && npm run levels
 ```
 
 Writes `src/game/levels.data.js`. Only needed after changing `tools/build-levels.mjs` or the core.

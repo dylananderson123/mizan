@@ -1,6 +1,6 @@
 # Design
 
-Working title on screen: **House of Zairajah** (one constant, `TITLE` in `src/ui/app.js`). The title is `[mine, unagreed]`: it reuses the name of Dylan's earlier magic-square game. Change the constant to rename.
+Name: **Mizan**, set by Dylan on 1 Oct 2026 `[Dylan]`. On screen it is one constant, `TITLE` in `src/ui/app.js`.
 
 Written 1 Oct 2026 from the master build brief. Sections follow the order the brief asked for.
 

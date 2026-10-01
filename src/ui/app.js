@@ -12,7 +12,7 @@ import { planHint } from '../core/hints.js';
 import { restoreDistance, startValues, restoreTargets } from '../core/carver.js';
 
 // The name on screen. One constant, so it is a one-line change.
-export const TITLE = 'House of Zairajah';
+export const TITLE = 'Mizan';
 
 // A short line under the board until the first move. Teaching by doing:
 // one sentence at most, and only where a new idea appears.
