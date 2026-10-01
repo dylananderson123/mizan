@@ -1,0 +1,12 @@
+{
+  "name": "magic-square-game",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A mathematical puzzle game that begins with magic squares. Vertical slice.",
+  "scripts": {
+    "test": "node --test tests/*.test.js",
+    "levels": "node tools/build-levels.mjs",
+    "serve": "python3 -m http.server 8963"
+  }
+}
