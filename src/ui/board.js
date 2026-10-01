@@ -142,6 +142,10 @@ export class BoardView {
 
   destroy() {
     this.resizeObs.disconnect();
+    clearTimeout(this.keyTimer);
+    clearTimeout(this.resolveTimer);
+    for (const t of this.lockTimers ?? []) clearTimeout(t);
+    this.destroyed = true;
   }
 
   cellStyle(c) {
@@ -218,16 +222,19 @@ export class BoardView {
       const where = sess.pos.get(t.id);
       if (where === TRAY) {
         el.removeAttribute('style');
+        if (this.drag?.el === el && this.drag.tx) el.style.transform = this.drag.tx;
         el.classList.add('in-tray');
         trayList.push([t.value, el]);
         el.setAttribute('aria-label', `Stone ${t.value}, not placed`);
       } else {
         el.setAttribute('style', this.cellStyle(where));
         el.classList.remove('in-tray');
+        if (this.drag?.el === el && this.drag.tx) el.style.transform = this.drag.tx;
         if (el.parentNode !== this.tileLayer) this.tileLayer.append(el);
         el.setAttribute('aria-label', `Stone ${t.value}, ${this.n === 3 ? cellName(3, where) : cellName(this.n, where)}${t.locked ? ', fixed' : ''}`);
       }
       el.classList.toggle('selected', this.selected === t.id);
+      if (!t.locked) el.setAttribute('aria-pressed', String(this.selected === t.id));
       const named = this.hint?.tiles?.includes(t.value);
       const pointedAt = where !== TRAY && this.hint?.cells?.includes(where) && !t.locked;
       el.classList.toggle('hinted', Boolean(named || pointedAt));
@@ -257,7 +264,9 @@ export class BoardView {
     const hl = new Set([...(this.related.cells || []), ...(this.hint?.cells || [])]);
     for (const [c, b] of this.socketEls) {
       const t = sess.tileAt(c);
-      b.setAttribute('aria-label', `${cellName(this.n, c)}, ${vals[c] ? `holds ${vals[c]}${t?.locked ? ', fixed' : ''}` : 'empty'}`);
+      const through = ev.lines.filter((l) => this.p.shape.lines.find((L) => L.id === l.id).cells.includes(c))
+        .map((l) => `${describeLine(this.n, l.id)} ${l.total} of ${this.p.target}${l.status === 'exact' ? ', complete' : ''}`);
+      b.setAttribute('aria-label', `${cellName(this.n, c)}, ${vals[c] ? `holds ${vals[c]}${t?.locked ? ', fixed' : ''}` : 'empty'}. ${through.join('. ')}.`);
       b.classList.toggle('over', this.dragOver === c);
       b.classList.toggle('hl', hl.has(c));
     }
@@ -297,13 +306,14 @@ export class BoardView {
 
   select(id) {
     this.selected = id;
+    if (id) this.announce(`Stone ${this.s.tile(id).value} chosen. Choose a space.`);
     const where = id ? this.s.pos.get(id) : null;
     if (where !== null && where !== undefined && where !== TRAY) this.setRelated(where);
     else this.render();
   }
 
   onTileDown(e, id) {
-    if (this.s.solved || e.button > 0) return;
+    if (this.s.solved || e.button > 0 || this.drag) return;
     e.preventDefault();
     this.app?.unlock();
     const el = this.tileEls.get(id);
@@ -326,7 +336,8 @@ export class BoardView {
       this.selected = null;
     }
     const lift = d.touch ? -22 : 0; // keep the stone visible above a fingertip
-    d.el.style.transform = `translate(${dx}px, ${dy + lift}px)`;
+    d.tx = `translate(${dx}px, ${dy + lift}px)`;
+    d.el.style.transform = d.tx;
     const target = this.dropTargetFor(d.el);
     if (target !== this.dragOver) {
       this.dragOver = target;
@@ -409,6 +420,11 @@ export class BoardView {
   }
 
   onTileKey(e, id) {
+    if (e.key === 'Escape' && this.selected) {
+      this.select(null);
+      this.announce('Choice cleared.');
+      return;
+    }
     if (e.key === 'Enter' || e.key === ' ') {
       e.preventDefault();
       this.app?.unlock();
@@ -426,9 +442,20 @@ export class BoardView {
     if (move) {
       e.preventDefault();
       const cells = this.p.shape.cells;
-      let next = c + move;
-      if ((e.key === 'ArrowLeft' && c % n === 0) || (e.key === 'ArrowRight' && c % n === n - 1)) next = -1;
-      if (cells.includes(next)) this.socketEls.get(next).focus();
+      // Step in that direction, past sealed cells, until a real space or the edge.
+      let next = c;
+      for (;;) {
+        const atEdge = (e.key === 'ArrowLeft' && next % n === 0) || (e.key === 'ArrowRight' && next % n === n - 1);
+        next += move;
+        if (atEdge || next < 0 || next >= n * n) { next = -1; break; }
+        if (cells.includes(next)) break;
+      }
+      if (next >= 0) this.socketEls.get(next).focus();
+      return;
+    }
+    if (e.key === 'Escape' && this.selected) {
+      this.select(null);
+      this.announce('Choice cleared.');
       return;
     }
     if (e.key === 'Enter' || e.key === ' ') {
@@ -455,7 +482,7 @@ export class BoardView {
       const act = () => {
         const t = this.s.tiles.find((x) => String(x.value) === this.keyBuffer && !x.locked);
         this.keyBuffer = '';
-        if (t) this.tryMove(t.id, c);
+        if (t && !this.destroyed) this.tryMove(t.id, c);
       };
       if (exact && !longer) act();
       else if (!exact && !longer) this.keyBuffer = '';
@@ -507,8 +534,12 @@ export class BoardView {
     sfx.place();
     haptic(12, this.settings.haptics);
 
+    if (document.activeElement === document.body || !document.activeElement) {
+      const c = typeof res.dest === 'number' ? res.dest : res.from;
+      if (typeof c === 'number') this.socketEls.get(c)?.focus({ preventScroll: true });
+    }
     const locked = res.after.lines.filter((l, i) => l.status === 'exact' && res.before.lines[i].status !== 'exact');
-    locked.forEach((l, k) => setTimeout(() => {
+    this.lockTimers = locked.map((l, k) => setTimeout(() => {
       sfx.lock(this.lineIds.indexOf(l.id));
       const m = this.markers.get(l.id);
       m.g.classList.add('locking');
@@ -526,10 +557,11 @@ export class BoardView {
 
   describeMove(res) {
     const where = res.dest === TRAY ? 'returned to the tray' : `placed in ${cellName(this.n, res.dest)}`;
-    const parts = [`${res.tile.value} ${where}.`];
+    const parts = [res.other ? `${res.tile.value} swapped with ${res.other.value}.` : `${res.tile.value} ${where}.`];
+    const changed = [res.from, res.dest].filter((x) => typeof x === 'number');
     for (const l of res.after.lines) {
       const L = this.p.shape.lines.find((x) => x.id === l.id);
-      if (res.dest !== TRAY && !L.cells.includes(res.dest)) continue;
+      if (l.status === 'empty' || !changed.some((c) => L.cells.includes(c))) continue;
       const word = { exact: 'complete', wrong: 'does not make the target', strained: 'cannot reach the target', partial: 'so far', empty: '' }[l.status];
       parts.push(`The ${describeLine(this.n, l.id)} totals ${l.total} of ${this.p.target}, ${word}.`);
     }
@@ -539,7 +571,7 @@ export class BoardView {
   // The square is whole. The pattern resolves, the light shifts, dust moves.
   resolve() {
     this.el.classList.add('resolved');
-    setTimeout(() => {
+    this.resolveTimer = setTimeout(() => {
       this.svg.classList.add('resolving');
       sfx.complete();
       haptic([10, 60, 30], this.settings.haptics);

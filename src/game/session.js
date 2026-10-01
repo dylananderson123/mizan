@@ -106,10 +106,18 @@ export class Session {
   }
 
   load(saved) {
+    const restore = this.p.kind === 'restore';
     for (const [id, where] of Object.entries(saved.pos ?? {})) {
       const t = this.tile(id);
       if (!t || t.locked) continue;
-      this.pos.set(id, where === TRAY ? TRAY : Number(where));
+      if (where === TRAY) {
+        if (restore) throw new Error('Corrupt save: a restore stone in the tray');
+        this.pos.set(id, TRAY);
+        continue;
+      }
+      const c = Number(where);
+      if (!this.p.shape.cells.includes(c) || this.p.givens[c] !== undefined) throw new Error(`Corrupt save: no space ${where}`);
+      this.pos.set(id, c);
     }
     // Two tiles in one cell means a corrupt save. Fall back to the start.
     const placed = [...this.pos.values()].filter((w) => w !== TRAY);

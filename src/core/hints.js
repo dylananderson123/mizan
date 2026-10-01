@@ -5,7 +5,7 @@
 
 import { evaluateBoard } from './constraints.js';
 import { describeLine } from './shape.js';
-import { findSolutions, initState, nextStep } from './solver.js';
+import { findSolutions, initState, nextStep, applyStep } from './solver.js';
 import { restoreDistance } from './carver.js';
 
 const NAMES3 = ['top left', 'top middle', 'top right', 'middle left', 'centre', 'middle right', 'bottom left', 'bottom middle', 'bottom right'];
@@ -74,21 +74,65 @@ function planFillHint(puzzle, values) {
   // Every line can still work, but the tiles placed so far cannot all stay.
   if (Object.keys(placed).length && findSolutions(puzzle, { limit: 1, extra: placed }).length === 0) {
     const sol = nearestSolution(puzzle, placed);
-    const c = Number(Object.keys(placed).find((k) => sol[+k] !== placed[k]));
-    const v = placed[c];
-    const home = sol.indexOf(v);
-    return plan([
-      { text: 'One of your tiles cannot stay where it is.', cells: [] , lines: puzzle.shape.lines.filter((L) => L.cells.includes(c)).map((L) => L.id) },
-      { text: `With the ${v} where it is, the square can never be finished.`, cells: [c] },
-      home >= 0
-        ? { text: `The ${v} belongs in ${theCell(n, home)}.`, cells: [c, home], ghost: { cell: home, value: v } }
-        : { text: `The ${v} is not part of this square.`, cells: [c] },
-    ]);
+    const cells = Object.keys(placed).map(Number);
+    const fails = (extra) => findSolutions(puzzle, { limit: 1, extra }).length === 0;
+    // Blame one stone only if that stone alone is impossible where it sits.
+    const alone = cells.find((c) => fails({ [c]: placed[c] }));
+    if (alone !== undefined) {
+      const v = placed[alone];
+      const home = sol.indexOf(v);
+      return plan([
+        { text: 'One of your stones cannot stay where it is.', lines: puzzle.shape.lines.filter((L) => L.cells.includes(alone)).map((L) => L.id) },
+        { text: `With the ${v} where it is, the square can never be finished.`, cells: [alone] },
+        home >= 0
+          ? { text: `The ${v} belongs in ${theCell(n, home)}.`, cells: [alone, home], ghost: { cell: home, value: v } }
+          : { text: `The ${v} is not part of this square.`, cells: [alone] },
+      ]);
+    }
+    // Otherwise the clash is between stones. Name a pair if one clashes.
+    let pair = null;
+    for (let i = 0; i < cells.length && !pair; i++) {
+      for (let j = i + 1; j < cells.length && !pair; j++) {
+        if (fails({ [cells[i]]: placed[cells[i]], [cells[j]]: placed[cells[j]] })) pair = [cells[i], cells[j]];
+      }
+    }
+    const moveMe = (pair ?? cells).find((c) => sol[c] !== placed[c]) ?? cells[0];
+    const home = sol.indexOf(placed[moveMe]);
+    const third = { text: `Move the ${placed[moveMe]}${home >= 0 ? ` to ${theCell(n, home)}` : ''}.`, cells: [moveMe], ghost: home >= 0 ? { cell: home, value: placed[moveMe] } : null };
+    return plan(pair
+      ? [
+        { text: 'Two of your stones cannot both stay.', cells: pair },
+        { text: `The ${placed[pair[0]]} and the ${placed[pair[1]]} each fit alone, but not together.`, cells: pair },
+        third,
+      ]
+      : [
+        { text: 'Your stones cannot all stay where they are.', cells },
+        { text: 'Each could work alone. Together they leave no way to finish.', cells },
+        third,
+      ]);
   }
 
   // The next deduction a person could make from here.
+  // Elimination-only steps place nothing, so the player cannot act on them.
+  // Run through them on scratch state and hint the first placement.
   const st = initState(puzzle, values);
-  const step = nextStep(st);
+  let step = nextStep(st);
+  const ruledOut = [];
+  for (let i = 0; i < 40 && step && !step.contradiction && step.value === undefined; i++) {
+    ruledOut.push(step);
+    applyStep(st, step);
+    step = nextStep(st);
+  }
+  if (ruledOut.length && step && !step.contradiction && step.value !== undefined) {
+    const first = ruledOut[0];
+    const why = `First rule out the ${listWords(first.eliminated)} in ${theCell(n, first.cell)}: the lines through it cannot all reach ${target} with ${first.eliminated.length > 1 ? 'those' : 'it'}.`;
+    const ghost = { cell: step.cell, value: step.value };
+    return plan([
+      { text: 'Look at the lines that cross here.', cells: [first.cell], lines: first.lines },
+      { text: why, cells: [first.cell], lines: first.lines },
+      { text: `Ruling stones out ${ruledOut.length > 1 ? `${ruledOut.length} times ` : ''}leaves only the ${step.value} for ${theCell(n, step.cell)}.`, cells: [step.cell], ghost },
+    ]);
+  }
   if (step && !step.contradiction) {
     const c = step.cell;
     const v = step.value;
@@ -112,7 +156,7 @@ function planFillHint(puzzle, values) {
       case 'place':
         return plan([
           { text: `Look at the ${v}.`, tiles: [v] },
-          { text: `There is only one space where the ${v} lets every line still work.`, tiles: [v] },
+          { text: `Try the ${v} in each empty space. In all but one, a line through it can no longer reach ${target}.`, tiles: [v] },
           { text: `The ${v} goes in ${where}.`, tiles: [v], cells: [c], ghost },
         ]);
       case 'crossing':

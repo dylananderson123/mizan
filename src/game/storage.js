@@ -44,14 +44,32 @@ export function writeSave(storage, save) {
   }
 }
 
+const isObj = (x) => x !== null && typeof x === 'object' && !Array.isArray(x);
+const TEXT_SCALES = [1, 1.15, 1.3];
+
+// Every field is checked by type. Anything wrong falls back to its default,
+// so one bad value never blanks the game.
 export function migrate(save) {
-  if (!save || typeof save !== 'object' || save.v !== SAVE_VERSION) return freshSave();
+  if (!isObj(save) || save.v !== SAVE_VERSION) return freshSave();
   const base = freshSave();
-  return {
-    ...base,
-    ...save,
-    settings: { ...base.settings, ...save.settings },
-    daily: { ...base.daily, ...save.daily },
-    completed: { ...save.completed },
+  const settings = { ...base.settings };
+  if (isObj(save.settings)) {
+    for (const [k, def] of Object.entries(base.settings)) {
+      const v = save.settings[k];
+      if (k === 'textScale') settings[k] = TEXT_SCALES.includes(v) ? v : def;
+      else settings[k] = typeof v === 'boolean' ? v : def;
+    }
+  }
+  const completed = {};
+  if (isObj(save.completed)) for (const [k, v] of Object.entries(save.completed)) if (isObj(v)) completed[k] = v;
+  const d = isObj(save.daily) ? save.daily : {};
+  const records = {};
+  if (isObj(d.records)) for (const [k, v] of Object.entries(d.records)) if (isObj(v)) records[k] = v;
+  const daily = {
+    streak: Number.isInteger(d.streak) && d.streak >= 0 ? d.streak : 0,
+    lastDate: typeof d.lastDate === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(d.lastDate) ? d.lastDate : null,
+    records,
   };
+  const current = isObj(save.current) && isObj(save.current.spec) && isObj(save.current.pos) ? save.current : null;
+  return { v: SAVE_VERSION, settings, completed, daily, current };
 }

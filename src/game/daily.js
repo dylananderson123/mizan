@@ -26,6 +26,11 @@ export function dailyPuzzle(dateKey) {
   throw new Error('No daily puzzle');
 }
 
+// A streak counts only if the last finish was today or yesterday.
+export function streakAlive(daily, todayKey) {
+  return daily.streak > 0 && (daily.lastDate === todayKey || daily.lastDate === previousDateKey(todayKey));
+}
+
 export function recordDaily(save, dateKey, stats) {
   const d = save.daily;
   if (d.records[dateKey]) return save; // first finish of the day counts

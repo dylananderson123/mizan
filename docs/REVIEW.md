@@ -23,8 +23,34 @@ Each pass: what was found, what was done. Newest last.
 - **Found:** on a 1280 x 820 laptop screen, Undo and Hint fell below the fold. **Done:** the board is smaller on wide screens.
 - **Checked and sound:** drag, tap-tap, keyboard (including two-digit numbers), three-tier hints followed to a full solve, restore by the hinted swap, save and resume after a reload, high contrast and larger text, Daily, Endless. No console errors on any screen.
 
+## Pass 4. Independent code audit (fresh reviewer, read-only)
+
+The reviewer fuzzed the solver and hints against the exhaustive solver: 86 puzzles, every solving trace, 1,493 random part-filled boards. **No wrong placement, elimination, contradiction or hint value.** Fifteen other defects, all fixed:
+
+| # | Defect | Fix |
+|---|---|---|
+| 1 | Crossing into a new space during a drag reset the stone to its start | The drag offset is re-applied after every redraw |
+| 2 | On deep 4x4 puzzles the hint could only ever say "the 2 cannot go here", forever | Hints run past elimination steps and always end in a placement |
+| 3 | Back, then reopening the same level, threw away its progress | Reopening an unfinished level resumes it |
+| 4 | A save with one bad field blanked the game on every visit | Every save field is checked by type; boot falls back to a clean save |
+| 5 | A saved stone in a space that does not exist vanished for good | Such a save is rejected and the level restarts |
+| 6 | Choosing a stone by keyboard was silent; Escape did nothing | Announced, `aria-pressed` set, Escape clears it |
+| 7 | Move announcements missed the swapped stone's lines and read empty lines | Only lines through changed spaces, never empty ones |
+| 8 | Line totals and swap count were not reachable by screen reader | Each space's label carries its lines' totals; swap count is real text |
+| 9 | Focus fell to the page after some moves; arrows could not cross sealed cells | Focus returns to the space; arrows skip sealed cells |
+| 10 | Timers from a finished puzzle could act on the next screen | Each puzzle owns and clears its timers |
+| 11 | Erasing progress mid-puzzle wrote the puzzle back into the new save | The puzzle is dropped, not stored |
+| 12 | A second finger left the first stone stuck mid-air | A second touch is ignored during a drag |
+| 13 | A hint blamed one stone when the clash was between two | The hint names the pair |
+| 14 | An impossible saved restore puzzle could hang the tab | Rejected on resume; the swap counter guards against it |
+| 15 | Unknown solver cap ran uncapped; a broken streak still showed | The solver throws; a streak shows only if the last finish was today or yesterday |
+
+`tests/regressions.test.js` holds one test per data-layer fix. The browser fixes were checked in headless Chrome.
+
+Still open: starting the Daily or Endless while a Journey level is unfinished replaces that level's saved state. There is one "current puzzle" slot. Levels are short, so this was left.
+
 ## Known limits, not fixed
 
 - Not yet touched by a finger. Haptics, audio and touch drag are untested on a real phone.
-- The hidden-single hint ("the 6 fits in only one space") is true but hard for a person to check. A better explanation would name the lines that rule out each other space.
+- The "only one space for this stone" hint now tells the player how to check it (try it in each space), but it still does not name the line that rules out each space.
 - 4x4 Endless runs on the main thread. Measured at under 0.3 s per puzzle on this Mac at depth 5; a slow phone will be slower. A web worker would remove the risk.

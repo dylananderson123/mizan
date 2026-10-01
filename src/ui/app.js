@@ -7,9 +7,9 @@ import { unlockAudio, configureSound } from './sound.js';
 import { Session, TRAY } from '../game/session.js';
 import { CHAPTERS, findLevel, nextLevel, chapterOpen, levelOpen, firstUnfinished } from '../game/levels.js';
 import { loadSave, writeSave, freshSave } from '../game/storage.js';
-import { dailyPuzzle, recordDaily, localDateKey, endlessPuzzle, ENDLESS_KINDS } from '../game/daily.js';
+import { dailyPuzzle, recordDaily, localDateKey, endlessPuzzle, ENDLESS_KINDS, streakAlive } from '../game/daily.js';
 import { planHint } from '../core/hints.js';
-import { restoreDistance, startValues } from '../core/carver.js';
+import { restoreDistance, startValues, restoreTargets } from '../core/carver.js';
 
 // The name on screen. One constant, so it is a one-line change.
 export const TITLE = 'House of Zairajah';
@@ -70,6 +70,7 @@ const icon = {
 
 function screen(cls, ...children) {
   if (current) stopPlay();
+  document.body.classList.remove('sunlit');
   clear(root);
   const el = h('div', { class: `screen ${cls}` }, ...children);
   root.append(el);
@@ -101,7 +102,7 @@ function menu() {
         h('button', { class: `btn${resume ? '' : ' primary'}`, onclick: journey }, 'Journey'),
         h('button', { class: 'btn', disabled: !dailyOpen, onclick: playDaily },
           'Daily square',
-          h('span', { class: 'btn-note' }, !dailyOpen ? 'Opens after Chapter I' : dailyDone ? `Done today · ${save.daily.streak} in a row` : save.daily.streak ? `${save.daily.streak} in a row` : '')),
+          h('span', { class: 'btn-note' }, !dailyOpen ? 'Opens after Chapter I' : dailyDone ? `Done today · ${save.daily.streak} in a row` : streakAlive(save.daily, today) ? `${save.daily.streak} in a row` : '')),
         h('button', { class: 'btn', onclick: endless }, 'Endless')),
     ),
     h('button', { class: 'icon corner', 'aria-label': 'Settings', onclick: openSettings }, icon.gear()));
@@ -177,6 +178,8 @@ function endless() {
 // ------------------------------------------------------------------- play
 
 function playLevel(id) {
+  // Same level, unfinished: pick it up where it was left.
+  if (save.current?.mode === 'journey' && save.current.levelId === id && !save.current.solved) return resumeCurrent();
   const at = findLevel(id);
   start(new Session(at.spec), { mode: 'journey', levelId: id, theta: at.chapter.theta, chapter: at.chapter });
 }
@@ -198,6 +201,7 @@ function resumeCurrent() {
   try {
     const c = save.current;
     const sess = Session.fromJSON(c);
+    if (sess.p.kind === 'restore' && restoreTargets(sess.p).length === 0) throw new Error('Unsolvable saved puzzle');
     const at = c.levelId ? findLevel(c.levelId) : null;
     start(sess, { mode: c.mode, levelId: c.levelId, date: c.date, kind: c.kind, band: c.band, seed: c.seed, theta: c.theta, chapter: at?.chapter });
   } catch {
@@ -207,11 +211,12 @@ function resumeCurrent() {
   }
 }
 
-function stopPlay() {
+function stopPlay({ store = true } = {}) {
   if (!current) return;
   clearInterval(current.timer);
+  clearTimeout(current.doneTimer);
   current.board.destroy();
-  storeCurrent();
+  if (store) storeCurrent();
   current = null;
 }
 
@@ -236,6 +241,9 @@ function start(session, ctx) {
   const doneEl = h('div', { class: 'done hidden', role: 'status' });
   let hintPlan = null;
   let hintTier = 0;
+  // This puzzle's own timers. Never read the module-level `current` from
+  // callbacks: by the time they fire, another puzzle may have started.
+  const own = { session, board: null, ctx, timer: null, doneTimer: null };
 
   const board = new BoardView({
     session, theta: ctx.theta ?? 45, settings: save.settings, announce,
@@ -271,11 +279,12 @@ function start(session, ctx) {
   function paintSwaps() {
     if (p.kind !== 'restore') return;
     if (fewest === null) fewest = restoreDistance(p, startValues(p)).distance;
+    if (!Number.isFinite(fewest)) return;
     clear(swapsEl);
     const used = session.moves;
     const total = Math.max(fewest, used);
     for (let i = 0; i < total; i++) swapsEl.append(h('i', { class: i < used ? (i < fewest ? 'used' : 'extra') : '' }));
-    swapsEl.setAttribute('aria-label', `${used} swap${used === 1 ? '' : 's'} made. The square can be restored in ${fewest}.`);
+    swapsEl.append(h('span', { class: 'sr-only' }, `${used} swap${used === 1 ? '' : 's'} made. The square can be restored in ${fewest}.`));
   }
   paintSwaps();
 
@@ -303,7 +312,7 @@ function start(session, ctx) {
   }
 
   function finish() {
-    clearInterval(current?.timer);
+    clearInterval(own.timer);
     const st = { time: session.elapsed, moves: session.moves, hints: session.hints, mistakes: session.mistakes };
     if (ctx.mode === 'journey') save.completed[ctx.levelId] = { moves: st.moves, hints: st.hints, at: Date.now() };
     if (ctx.mode === 'daily') recordDaily(save, ctx.date, st);
@@ -328,7 +337,7 @@ function start(session, ctx) {
         ctx.mode === 'journey' && next ? h('button', { class: 'btn primary', onclick: () => playLevel(next.id) }, 'Next') : null,
         ctx.mode === 'endless' ? h('button', { class: 'btn primary', onclick: () => playEndless(ctx.kind, ctx.band) }, 'Another') : null,
         h('button', { class: 'btn', onclick: ctx.mode === 'journey' ? journey : menu }, ctx.mode === 'journey' ? 'Journey' : 'Back')));
-    setTimeout(() => {
+    own.doneTimer = setTimeout(() => {
       doneEl.classList.remove('hidden');
       document.body.classList.add('sunlit');
       (doneEl.querySelector('.btn.primary') ?? doneEl.querySelector('.btn'))?.focus({ preventScroll: true });
@@ -355,8 +364,9 @@ function start(session, ctx) {
     doneEl);
   document.body.classList.remove('sunlit');
 
-  current = { session, board, ctx, timer: null };
-  current.timer = setInterval(() => {
+  own.board = board;
+  current = own;
+  own.timer = setInterval(() => {
     if (document.hidden || session.solved || document.querySelector('dialog[open]')) return;
     session.elapsed += 1000;
     timerEl.textContent = fmtTime(session.elapsed);
@@ -408,7 +418,10 @@ function openSettings() {
     h('div', { class: 'dlg-actions' },
       h('button', {
         class: 'btn quiet', onclick: () => {
-          if (window.confirm('Erase all progress?')) { save = freshSave(); persist(); applySettings(); dlg.close(); menu(); }
+          if (window.confirm('Erase all progress?')) {
+            stopPlay({ store: false }); // do not write the old puzzle into the new save
+            save = freshSave(); persist(); applySettings(); dlg.close(); menu();
+          }
         },
       }, 'Erase progress'),
       h('button', { class: 'btn primary', onclick: () => dlg.close() }, 'Done')));
@@ -432,5 +445,13 @@ document.addEventListener('keydown', (e) => {
   }
 });
 
-applySettings();
-menu();
+try {
+  applySettings();
+  menu();
+} catch {
+  // A save the checks did not foresee: start clean rather than show nothing.
+  save = freshSave();
+  persist();
+  applySettings();
+  menu();
+}

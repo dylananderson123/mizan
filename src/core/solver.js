@@ -334,6 +334,7 @@ const TECH_RANK = { line: RANK.line, single: RANK.single, crossing: RANK.crossin
 export function solveLogically(puzzle, { values = null, maxTechnique = 'trial', maxSteps = 400 } = {}) {
   const st = initState(puzzle, values);
   const maxRank = TECH_RANK[maxTechnique];
+  if (maxRank === undefined) throw new Error(`Unknown technique "${maxTechnique}"`);
   const steps = [];
   for (let i = 0; i < maxSteps; i++) {
     if (isFilled(st)) {
