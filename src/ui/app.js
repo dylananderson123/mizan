@@ -2,10 +2,12 @@
 
 import { h, s, clear } from './dom.js';
 import { BoardView } from './board.js';
-import { emblem, field } from './pattern.js';
-import { unlockAudio, configureSound } from './sound.js';
+import { emblem, field, starOutline } from './pattern.js';
+import { unlockAudio, configureSound, sfx, sceneAmbience } from './sound.js';
+import { sheikhSvg } from './sheikh.js';
+import { celebrate, sealStar } from './reward.js';
 import { Session, TRAY } from '../game/session.js';
-import { CHAPTERS, findLevel, nextLevel, chapterOpen, levelOpen, firstUnfinished } from '../game/levels.js';
+import { CHAPTERS, findLevel, nextLevel, chapterOpen, levelOpen, chapterById, DAILY_AFTER, FOUR_AT } from '../game/levels.js';
 import { loadSave, writeSave, freshSave } from '../game/storage.js';
 import { dailyPuzzle, recordDaily, localDateKey, endlessPuzzle, ENDLESS_KINDS, streakAlive } from '../game/daily.js';
 import { planHint } from '../core/hints.js';
@@ -14,21 +16,36 @@ import { restoreDistance, startValues, restoreTargets } from '../core/carver.js'
 // The name on screen. One constant, so it is a one-line change.
 export const TITLE = 'Mizan';
 
-// A short line under the board until the first move. Teaching by doing:
-// one sentence at most, and only where a new idea appears.
+// What the sheikh says under the goal until the first move. Teaching by
+// doing: one sentence at most, and only where a new idea appears.
 const TEACH = {
-  'c1-01': 'Move a stone into the gap. The line must make 15.',
+  'c1-01': 'Move a stone from the tray into the gap.',
   'c1-02': 'Columns count too.',
   'c1-03': 'One stone can serve two lines.',
   'c1-04': 'Where lines cross, both must agree.',
   'c1-05': 'Diagonals count.',
-  'c1-06': 'More than one answer is right here.',
   'c1-07': 'Every row, every column, both diagonals.',
-  'c2-01': 'New numbers. Look at the target.',
-  'c2-05': 'Not every stone belongs.',
-  'c3-01': 'Drag one stone onto another to swap them.',
-  'c4-01': 'Four by four. Every line makes 34.',
+  'l4-01': 'New numbers, so a new total. Look at it first.',
+  'l4-02': 'The total is always three times the centre.',
+  'l5-01': 'Four by four. Sixteen stones, one total.',
+  'l6-01': 'Drag one stone onto another to swap them.',
+  'l7-01': 'Not every stone belongs.',
+  'l8-03': 'Where two lines cross, only some stones fit both.',
+  'l9-03': 'If you are stuck, suppose a stone and follow it.',
 };
+
+// What he says when a square is finished. Chosen by the puzzle, not at
+// random, so the same puzzle always gets the same words.
+const PRAISE = ["Masha'Allah.", 'Well done.', 'Barak Allahu feek.', 'Good. Every line agrees.'];
+
+// The goal sentence, fitted to how many lines the board has.
+function goalLead(p) {
+  if (p.kind === 'restore') return 'Swap stones so every line makes';
+  const n = p.shape.lines.length;
+  if (n === 1) return 'This line must make';
+  if (n === 2) return 'Both lines must make';
+  return 'Every line must make';
+}
 
 const storage = (() => {
   try { return window.localStorage; } catch { return { getItem: () => null, setItem: () => {} }; }
@@ -88,7 +105,7 @@ function bar(title, onBack) {
 
 function menu() {
   const resume = save.current && !save.current.solved ? save.current : null;
-  const dailyOpen = CHAPTERS[0].puzzles.every((p) => save.completed[p.id]);
+  const dailyOpen = chapterById(DAILY_AFTER).puzzles.every((p) => save.completed[p.id]);
   const today = localDateKey();
   const dailyDone = Boolean(save.daily.records[today]);
   screen('menu',
@@ -102,7 +119,7 @@ function menu() {
         h('button', { class: `btn${resume ? '' : ' primary'}`, onclick: journey }, 'Journey'),
         h('button', { class: 'btn', disabled: !dailyOpen, onclick: playDaily },
           'Daily square',
-          h('span', { class: 'btn-note' }, !dailyOpen ? 'Opens after Chapter I' : dailyDone ? `Done today · ${save.daily.streak} in a row` : streakAlive(save.daily, today) ? `${save.daily.streak} in a row` : '')),
+          h('span', { class: 'btn-note' }, !dailyOpen ? `Opens after Level ${chapterById(DAILY_AFTER).num}` : dailyDone ? `Done today · ${save.daily.streak} in a row` : streakAlive(save.daily, today) ? `${save.daily.streak} in a row` : '')),
         h('button', { class: 'btn', onclick: endless }, 'Endless')),
     ),
     h('button', { class: 'icon corner', 'aria-label': 'Settings', onclick: openSettings }, icon.gear()));
@@ -116,7 +133,7 @@ function journey() {
     const open = chapterOpen(ch, save.completed);
     const doneCount = ch.puzzles.filter((p) => save.completed[p.id]).length;
     const complete = ch.puzzles.length && doneCount === ch.puzzles.length;
-    const pieces = ch.sealed ? emblem(60, 1, 3) : emblem(ch.theta, ch.puzzles.length, 4);
+    const pieces = ch.sealed ? emblem(60, 1, 3) : emblem(ch.theta, ch.puzzles.length, 3);
     const art = s('svg', { class: 'emblem', viewBox: '0 0 100 100', 'aria-hidden': 'true' },
       s('rect', { class: 'emblem-bg', x: 1, y: 1, width: 98, height: 98, rx: 3 }),
       ...pieces.map((d, i) => s('path', { d, class: i < doneCount ? 'lit' : '' })));
@@ -126,16 +143,16 @@ function journey() {
         const can = levelOpen(p.id, save.completed);
         return h('button', {
           class: `lvl${done ? ' done' : ''}${can && !done ? ' next' : ''}`,
-          disabled: !can, 'aria-label': `Level ${i + 1}${done ? ', complete' : can ? '' : ', locked'}`,
+          disabled: !can, 'aria-label': `Puzzle ${i + 1}${done ? ', complete' : can ? '' : ', locked'}`,
           onclick: () => playLevel(p.id),
         }, h('span', {}, String(i + 1)));
       }));
     list.append(h('section', { class: `chapter${open ? ' open' : ''}${ch.sealed ? ' sealed' : ''}${complete ? ' complete' : ''}` },
       art,
       h('div', { class: 'ch-text' },
-        h('p', { class: 'numeral' }, `Chapter ${ch.numeral}`),
+        h('p', { class: 'numeral' }, `Level ${ch.num}`),
         h('h3', {}, ch.title),
-        ch.sealed ? h('p', { class: 'sealed-note' }, 'Sealed') : open ? dots : h('p', { class: 'sealed-note' }, 'Opens when the chapter before is whole'))));
+        ch.sealed ? h('p', { class: 'sealed-note' }, 'Sealed') : open ? dots : h('p', { class: 'sealed-note' }, 'Opens when the level before is complete'))));
   }
   screen('journey', bar('Journey', menu), list);
 }
@@ -143,7 +160,7 @@ function journey() {
 // ---------------------------------------------------------------- endless
 
 function endless() {
-  const fourOpen = chapterOpen(CHAPTERS[3], save.completed);
+  const fourOpen = chapterOpen(chapterById(FOUR_AT), save.completed);
   let kind = 'fill3';
   let band = 2;
   const kinds = h('div', { class: 'seg', role: 'radiogroup', 'aria-label': 'Puzzle' });
@@ -151,11 +168,11 @@ function endless() {
   const draw = () => {
     clear(kinds);
     for (const k of ENDLESS_KINDS) {
-      const locked = k.needs === 'c4' && !fourOpen;
+      const locked = k.needs === FOUR_AT && !fourOpen;
       kinds.append(h('button', {
         role: 'radio', 'aria-checked': String(kind === k.id), class: kind === k.id ? 'on' : '', disabled: locked,
         onclick: () => { kind = k.id; band = Math.min(band, Math.max(...k.bands)); draw(); },
-      }, k.label, locked ? h('span', { class: 'btn-note' }, 'After Chapter IV') : null));
+      }, k.label, locked ? h('span', { class: 'btn-note' }, `Opens at Level ${chapterById(FOUR_AT).num}`) : null));
     }
     clear(depth);
     const k = ENDLESS_KINDS.find((x) => x.id === kind);
@@ -236,7 +253,16 @@ function start(session, ctx) {
   const p = session.p;
   const inscription = p.meta?.inscription ?? '';
   const teachText = TEACH[ctx.levelId] ?? '';
-  const hintLine = h('p', { class: `hint-line${teachText ? ' teach' : ''}`, 'aria-live': 'polite' }, teachText);
+  // The sheikh's words: the teaching line first, then hints, then praise.
+  const hintLine = h('p', { class: `say-text${teachText ? ' teach' : ''}`, 'aria-live': 'polite' }, teachText);
+  const sheikhEl = h('figure', { class: 'sheikh', 'aria-hidden': 'true' }, sheikhSvg());
+  const speak = (text, { cls = '', mood = 'speaking' } = {}) => {
+    hintLine.className = `say-text${cls ? ` ${cls}` : ''}`;
+    hintLine.textContent = text;
+    sheikhEl.classList.remove('speaking', 'pleased');
+    void sheikhEl.offsetWidth; // restart the nod
+    if (text) sheikhEl.classList.add(mood);
+  };
   const timerEl = h('span', { class: `timer${save.settings.showTimer ? '' : ' hidden'}`, 'aria-hidden': 'true' }, fmtTime(session.elapsed));
   const doneEl = h('div', { class: 'done hidden', role: 'status' });
   let hintPlan = null;
@@ -251,8 +277,7 @@ function start(session, ctx) {
       hintPlan = null;
       hintTier = 0;
       paintHint();
-      hintLine.textContent = '';
-      hintLine.classList.remove('teach');
+      if (hintLine.textContent) speak('');
       paintSwaps();
       storeCurrent();
     },
@@ -305,8 +330,7 @@ function start(session, ctx) {
     }
     const tier = hintPlan.tiers[hintTier - 1];
     board.setHint(tier);
-    hintLine.classList.remove('teach');
-    hintLine.textContent = tier.text;
+    speak(tier.text);
     paintHint();
     storeCurrent();
   }
@@ -329,36 +353,54 @@ function start(session, ctx) {
     }
     const next = ctx.mode === 'journey' ? nextLevel(ctx.levelId) : null;
     const chapterDone = ctx.mode === 'journey' && ctx.chapter && ctx.chapter.puzzles.every((x) => save.completed[x.id]);
+    const chapterIndex = chapterDone ? CHAPTERS.indexOf(ctx.chapter) : -1;
+    const reduced = save.settings.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
+    celebrate(board.el, { theta: ctx.theta ?? 45, big: chapterDone, reduced });
+    if (chapterDone) sfx.level();
+    const seed = [...(ctx.levelId ?? ctx.date ?? ctx.seed ?? '')].reduce((a, c) => a + c.charCodeAt(0), 0);
+    const praise = PRAISE[seed % PRAISE.length];
+    setTimeout(() => speak(chapterDone ? `Masha'Allah. Level ${ctx.chapter.num} is complete.` : praise, { cls: 'praise', mood: 'pleased' }),
+      save.settings.reducedMotion ? 0 : 700);
+    const doneWord = chapterDone ? `Level ${ctx.chapter.num} complete.` : word;
     clear(doneEl);
     doneEl.append(
-      h('p', { class: 'done-word' }, chapterDone ? `Chapter ${ctx.chapter.numeral} is whole.` : word),
+      sealStar(),
+      h('p', { class: 'done-word' }, doneWord),
       ...lines.map((l) => h('p', { class: 'done-line' }, l)),
       h('div', { class: 'done-actions' },
-        ctx.mode === 'journey' && next ? h('button', { class: 'btn primary', onclick: () => playLevel(next.id) }, 'Next') : null,
+        ctx.mode === 'journey' && chapterDone
+          ? h('button', { class: 'btn primary', onclick: () => interlude(chapterIndex, next?.id) }, 'Continue')
+          : ctx.mode === 'journey' && next ? h('button', { class: 'btn primary', onclick: () => playLevel(next.id) }, 'Next') : null,
         ctx.mode === 'endless' ? h('button', { class: 'btn primary', onclick: () => playEndless(ctx.kind, ctx.band) }, 'Another') : null,
         h('button', { class: 'btn', onclick: ctx.mode === 'journey' ? journey : menu }, ctx.mode === 'journey' ? 'Journey' : 'Back')));
     own.doneTimer = setTimeout(() => {
       doneEl.classList.remove('hidden');
       document.body.classList.add('sunlit');
       (doneEl.querySelector('.btn.primary') ?? doneEl.querySelector('.btn'))?.focus({ preventScroll: true });
-      announce(`${chapterDone ? `Chapter ${ctx.chapter.numeral} is whole.` : word} ${lines.join(' ')}`);
+      announce(`${doneWord} ${lines.join(' ')}`);
     }, save.settings.reducedMotion ? 200 : 1500);
   }
 
   const back = () => (ctx.mode === 'journey' ? journey() : menu());
-  const targetBlock = h('div', { class: 'target' },
-    h('p', { class: 'inscription' }, inscription),
-    h('p', { class: 'target-value', 'aria-label': `Every line totals ${p.target}` }, String(p.target)),
-    h('p', { class: 'target-label' }, p.kind === 'restore' ? 'every line, once restored' : 'every line'));
+  // The guide, upper right: the goal number sits inside his instruction, in
+  // an eight-point star, so the eye finds it before it finds the stones.
+  const goal = h('span', { class: 'goal' },
+    s('svg', { viewBox: '0 0 40 40', 'aria-hidden': 'true' }, s('path', { d: starOutline(20, 20, 19, 0.78) })),
+    h('b', {}, String(p.target)));
+  const guide = h('div', { class: 'guide' },
+    h('div', { class: 'speech' },
+      inscription ? h('p', { class: 'inscription' }, inscription) : null,
+      h('p', { class: 'say-goal', 'aria-label': `${goalLead(p)} ${p.target}.` }, h('span', { class: 'say-lead' }, goalLead(p)), goal),
+      hintLine),
+    sheikhEl);
 
   const el = screen('play',
     h('header', { class: 'bar' },
       h('button', { class: 'icon', 'aria-label': 'Back', onclick: back }, icon.back()),
       timerEl,
       h('button', { class: 'icon', 'aria-label': 'Settings', onclick: openSettings }, icon.gear())),
-    targetBlock,
+    guide,
     h('div', { class: 'stage' }, board.el),
-    hintLine,
     p.kind === 'restore' ? swapsEl : board.tray,
     h('div', { class: 'actions' }, undoBtn, hintBtn),
     doneEl);
@@ -375,6 +417,57 @@ function start(session, ctx) {
   storeCurrent();
   board.sizeTray();
   el.querySelector('.tile:not(.locked)')?.focus({ preventScroll: true });
+}
+
+// ------------------------------------------------------------ interlude
+
+// Between levels: a short scenic film, then the next level's name over the
+// first puzzle. The scenes module is loaded on demand; if it fails, the game
+// goes straight on.
+let SCENE_LIST = null;
+function interlude(chapterIndex, nextId) {
+  const nextChapter = nextId ? findLevel(nextId).chapter : null;
+  const goOn = () => (nextId ? playLevel(nextId) : journey());
+  const box = h('div', { class: 'il-scene' });
+  const place = h('p', { class: 'il-place' });
+  const sub = h('p', { class: 'il-sub' });
+  const card = h('div', { class: 'il-card' },
+    nextChapter ? h('p', { class: 'numeral' }, `Level ${nextChapter.num}`) : null,
+    h('p', { class: 'il-title' }, nextChapter ? nextChapter.title : 'The Journey so far'));
+  const skip = h('button', { class: 'il-skip', onclick: () => end() }, 'Skip');
+  const el = h('div', { class: 'interlude', role: 'dialog', 'aria-label': 'Interlude' },
+    box, h('div', { class: 'il-caption' }, place, sub), skip, card);
+  document.body.append(el);
+  skip.focus({ preventScroll: true });
+  let handle = null;
+  let stopSound = () => {};
+  let ended = false;
+  const onKey = (e) => { if (e.key === 'Escape') end(); };
+  document.addEventListener('keydown', onKey);
+  function end() {
+    if (ended) return;
+    ended = true;
+    document.removeEventListener('keydown', onKey);
+    handle?.stop();
+    stopSound();
+    goOn();
+    el.classList.add('carding');
+    announce(nextChapter ? `Level ${nextChapter.num}. ${nextChapter.title}.` : 'Back to the Journey.');
+    setTimeout(() => el.classList.add('leaving'), save.settings.reducedMotion ? 600 : 1500);
+    setTimeout(() => el.remove(), save.settings.reducedMotion ? 800 : 2400);
+  }
+  const reduced = save.settings.reducedMotion || matchMedia('(prefers-reduced-motion: reduce)').matches;
+  (SCENE_LIST ? Promise.resolve(SCENE_LIST) : import('./scenes.js').then((m) => (SCENE_LIST = m)))
+    .then((m) => {
+      if (ended) return;
+      const scene = m.SCENES[Math.max(0, chapterIndex) % m.SCENES.length];
+      place.textContent = scene.caption;
+      sub.textContent = scene.sub;
+      announce(`${scene.caption}. ${scene.sub}.`);
+      stopSound = sceneAmbience(scene.id);
+      handle = m.mountScene(box, scene.id, { reduced, duration: 7000, onEnd: end });
+    })
+    .catch(() => end());
 }
 
 document.addEventListener('visibilitychange', () => { if (document.hidden) storeCurrent(); });

@@ -1,4 +1,5 @@
-// Chapter I, The First Square. Handcrafted.
+// Levels 1 to 3, the tutorial. Handcrafted. (c1-06 "Opposites" was cut
+// on 1 Oct 2026 to make the climb faster.)
 // Every level is a piece of the same Lo Shu:
 //   4 9 2
 //   3 5 7
@@ -20,8 +21,6 @@ export const CHAPTER_1 = [
     meta: { inscription: 'One space, two lines' } },
   { ...base, id: 'c1-05', cells: [0, 1, 2, 4, 8], lines: ['r0', 'd'], givens: { 1: 9, 4: 5, 8: 6 }, pool: [2, 3, 4, 8],
     meta: { inscription: 'Slant' } },
-  { ...base, id: 'c1-06', cells: [1, 3, 4, 5, 7], lines: ['r1', 'c1'], givens: { 4: 5 }, pool: [1, 3, 7, 9],
-    meta: { inscription: 'Opposites' } },
   { ...base, id: 'c1-07', givens: { 0: 4, 2: 2, 3: 3, 4: 5, 7: 1, 8: 6 }, pool: [7, 8, 9],
     meta: { inscription: 'The square' } },
   { ...base, id: 'c1-08', givens: { 0: 4, 2: 2, 4: 5, 7: 1 }, pool: [3, 6, 7, 8, 9],

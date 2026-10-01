@@ -5,7 +5,7 @@ import { countSolutions, findSolutions, solveLogically } from '../src/core/solve
 import { rateDifficulty } from '../src/core/difficulty.js';
 import { restoreDistance, startValues } from '../src/core/carver.js';
 import { evaluateBoard } from '../src/core/constraints.js';
-import { CHAPTERS, nextLevel, levelOpen, chapterOpen, firstUnfinished } from '../src/game/levels.js';
+import { CHAPTERS, nextLevel, levelOpen, chapterOpen, firstUnfinished, findLevel } from '../src/game/levels.js';
 import { Session, TRAY } from '../src/game/session.js';
 import { loadSave, writeSave, freshSave, migrate, SAVE_KEY } from '../src/game/storage.js';
 import { dailyPuzzle, recordDaily, endlessPuzzle, localDateKey } from '../src/game/daily.js';
@@ -57,8 +57,8 @@ test('progression opens chapters and levels in order', () => {
   for (const p of CHAPTERS[0].puzzles) done[p.id] = { moves: 1 };
   assert.ok(chapterOpen(CHAPTERS[1], done));
   assert.equal(firstUnfinished(done).id, CHAPTERS[1].puzzles[0].id);
-  assert.equal(nextLevel('c1-10').id, CHAPTERS[1].puzzles[0].id);
-  assert.ok(!chapterOpen(CHAPTERS[4], done), 'sealed chapters stay sealed');
+  assert.equal(nextLevel(CHAPTERS[0].puzzles.at(-1).id).id, CHAPTERS[1].puzzles[0].id);
+  assert.ok(!chapterOpen(CHAPTERS.at(-1), done), 'sealed levels stay sealed');
 });
 
 test('session: place, swap, return, undo, solve', () => {
@@ -81,7 +81,7 @@ test('session: place, swap, return, undo, solve', () => {
 });
 
 test('session: restore puzzles only swap', () => {
-  const spec = CHAPTERS[2].puzzles[0];
+  const spec = findLevel('l6-01').spec;
   const s = new Session(spec);
   const [a, b] = Object.keys(spec.start).map(Number);
   const ta = s.tileAt(a);
@@ -91,7 +91,7 @@ test('session: restore puzzles only swap', () => {
 });
 
 test('session save and resume round-trip', () => {
-  const s = new Session(CHAPTERS[0].puzzles[6]);
+  const s = new Session(findLevel('c1-07').spec);
   s.move('t9', 1);
   s.hints = 2;
   s.elapsed = 1234;
@@ -155,4 +155,15 @@ test('endless puzzles generate for every kind and band, quickly', () => {
       if (p.kind === 'fill') assert.equal(rateDifficulty(p).band, band);
     }
   }
+});
+
+test('levels are short, and the board reaches 4x4 early', () => {
+  const open = CHAPTERS.filter((c) => !c.sealed);
+  assert.ok(open.length >= 9, 'at least nine playable levels');
+  for (const c of open) assert.ok(c.puzzles.length >= 3 && c.puzzles.length <= 4, `${c.id} has 3 to 4 puzzles`);
+  const flat = open.flatMap((c) => c.puzzles);
+  const first4 = flat.findIndex((p) => p.n === 4);
+  assert.ok(first4 >= 0 && first4 <= 12, `first 4x4 is puzzle ${first4 + 1}`);
+  const lastLevel = open.at(-1).puzzles;
+  assert.ok(lastLevel.some((p) => p.n === 4 && (p.meta?.band ?? 0) >= 4), 'the last level reaches crossing or trial depth');
 });

@@ -45,7 +45,7 @@ export function recordDaily(save, dateKey, stats) {
 export const ENDLESS_KINDS = [
   { id: 'fill3', label: 'Three', n: 3, kind: 'fill', bands: [1, 2, 3] },
   { id: 'restore3', label: 'Broken three', n: 3, kind: 'restore', bands: [1, 2, 3] },
-  { id: 'fill4', label: 'Four', n: 4, kind: 'fill', bands: [1, 2, 3, 4, 5], needs: 'c4' },
+  { id: 'fill4', label: 'Four', n: 4, kind: 'fill', bands: [1, 2, 3, 4, 5], needs: 'l5' },
 ];
 
 export function endlessPuzzle(kindId, band, seed) {

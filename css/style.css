@@ -180,10 +180,7 @@ button:focus-visible, input:focus-visible, .socket-hit:focus-visible {
 .play { gap: 4px; }
 .play .bar { position: relative; }
 .timer { font-variant-numeric: tabular-nums; font-size: 0.9rem; color: var(--ink-soft); letter-spacing: 0.06em; }
-.target { text-align: center; margin: -6px 0 8px; }
 .inscription { margin: 0; font-size: 0.74rem; letter-spacing: 0.22em; text-transform: uppercase; color: var(--ink-soft); min-height: 1em; }
-.target-value { margin: 0; font-size: 2.4rem; font-weight: 300; line-height: 1.1; letter-spacing: 0.02em; font-variant-numeric: lining-nums; }
-.target-label { margin: 0; font-size: 0.72rem; letter-spacing: 0.14em; color: var(--ink-soft); text-transform: uppercase; }
 
 .stage { width: var(--board); }
 
@@ -329,7 +326,7 @@ html.lh .actions { justify-content: flex-start; flex-direction: row-reverse; }
 .done-line { margin: 0; color: var(--ink-soft); font-variant-numeric: tabular-nums; }
 .done-actions { display: flex; gap: 10px; margin-top: 12px; flex-wrap: wrap; justify-content: center; }
 .done-actions .btn { min-width: 150px; }
-.play:has(.done:not(.hidden)) .actions, .play:has(.done:not(.hidden)) .hint-line { display: none; }
+.play:has(.done:not(.hidden)) .actions { display: none; }
 @keyframes rise { from { opacity: 0; transform: translateY(6px); } }
 
 .dust { pointer-events: none; overflow: visible; }
@@ -338,6 +335,125 @@ html.lh .actions { justify-content: flex-start; flex-direction: row-reverse; }
   opacity: 0; animation: drift 3s ease-out forwards;
 }
 @keyframes drift { 0% { opacity: 0; transform: translate(0, 0); } 20% { opacity: 0.9; } 100% { opacity: 0; transform: translate(var(--dx), -50px); } }
+
+/* ---------------------------------------------------------------- guide */
+
+/* The sheikh, upper right. His speech holds the goal number, large, inside
+   an eight-point star, so it is the first thing the eye finds. */
+.guide { width: var(--board); display: flex; align-items: flex-start; gap: 10px; margin: -2px 0 8px; }
+html.lh .guide { flex-direction: row-reverse; }
+.speech {
+  position: relative; flex: 1; min-width: 0; min-height: 88px; padding: 9px 14px 10px;
+  background: rgba(255, 252, 245, 0.72); border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(var(--shadow), 0.14), 0 6px 14px -10px rgba(var(--shadow), 0.4);
+}
+.speech::after {
+  content: ''; position: absolute; right: -7px; top: 30px; width: 12px; height: 12px;
+  background: inherit; transform: rotate(45deg);
+  box-shadow: 1px -1px 0 0 rgba(var(--shadow), 0.14);
+}
+html.lh .speech::after { right: auto; left: -7px; box-shadow: -1px 1px 0 0 rgba(var(--shadow), 0.14); }
+.speech .inscription { text-align: left; margin-bottom: 2px; }
+.say-goal { margin: 0; display: grid; grid-template-columns: auto auto; justify-content: start; align-items: center; gap: 10px; }
+.say-lead { font-size: 0.98rem; font-weight: 400; color: var(--ink); letter-spacing: 0.01em; }
+.goal { position: relative; display: inline-grid; place-items: center; width: 3.3rem; height: 3.3rem; flex: none; }
+.goal svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.goal path { fill: var(--indigo); stroke: var(--brass-light); stroke-width: 1.2; stroke-linejoin: round; }
+.goal b { position: relative; color: var(--chalk); font-weight: 500; font-size: 1.32rem; font-variant-numeric: tabular-nums lining-nums; letter-spacing: 0.01em; }
+.say-text { margin: 4px 0 0; min-height: 1.3em; font-size: 0.92rem; line-height: 1.35; color: var(--ink); }
+.say-text:empty { display: none; }
+.say-text.teach { color: var(--ink-soft); }
+.say-text.praise { color: var(--indigo); font-weight: 500; letter-spacing: 0.02em; animation: rise 0.6s var(--ease-out) both; }
+
+.sheikh { margin: 0; width: 78px; height: 94px; flex: none; }
+.sheikh-art { width: 100%; height: 100%; display: block; overflow: visible; filter: drop-shadow(0 4px 6px rgba(var(--shadow), 0.18)); }
+.sheikh .sh-head { transform-box: view-box; transform-origin: 50px 82px; }
+.sheikh .sh-body { transform-box: view-box; transform-origin: 50px 120px; animation: sh-breathe 5.5s ease-in-out infinite; }
+.sheikh .sh-eyes { transform-box: fill-box; transform-origin: center; animation: sh-blink 6.5s infinite; }
+.sheikh.speaking .sh-head { animation: sh-nod 0.9s var(--ease-out); }
+.sheikh.pleased .sh-head { animation: sh-pleased 1.6s var(--ease-out); }
+@keyframes sh-breathe { 50% { transform: translateY(-0.6px) scale(1.006); } }
+@keyframes sh-blink { 0%, 96%, 100% { transform: scaleY(1); } 98% { transform: scaleY(0.15); } }
+@keyframes sh-nod { 30% { transform: rotate(-3deg) translateY(0.6px); } 65% { transform: rotate(1deg); } }
+@keyframes sh-pleased { 20% { transform: translateY(1.4px) rotate(-2deg); } 45% { transform: translateY(-0.4px); } 65% { transform: translateY(1.2px) rotate(1.5deg); } 85% { transform: none; } }
+
+/* --------------------------------------------------------------- reward */
+
+/* A band of pattern light that travels outward from the board across the
+   whole wall. The band is a moving ring in a mask. */
+@property --r { syntax: '<length>'; inherits: false; initial-value: 0px; }
+.bloom {
+  /* z-index 0: on the wall, behind the board and the words (#app is 1) */
+  position: fixed; inset: 0; pointer-events: none; z-index: 0;
+  -webkit-mask-image: radial-gradient(circle at var(--cx) var(--cy), transparent calc(var(--r) - 22vmax), #000 calc(var(--r) - 9vmax), #000 calc(var(--r) - 2vmax), transparent var(--r));
+  mask-image: radial-gradient(circle at var(--cx) var(--cy), transparent calc(var(--r) - 22vmax), #000 calc(var(--r) - 9vmax), #000 calc(var(--r) - 2vmax), transparent var(--r));
+  animation: bloom-out 4.2s cubic-bezier(0.3, 0.45, 0.45, 1) both;
+}
+.bloom svg { width: 100%; height: 100%; }
+.bloom path { fill: none; stroke-width: 0.22; stroke-linecap: round; }
+.bloom.brass path { stroke: var(--brass); }
+.bloom.indigo path { stroke: var(--indigo); stroke-width: 0.2; }
+.bloom::before {
+  content: ''; position: absolute; inset: 0;
+  background: radial-gradient(circle at var(--cx) var(--cy), rgba(255, 246, 222, 0) 0, rgba(255, 246, 222, 0.5) 60%, rgba(255, 246, 222, 0) 100%);
+}
+@keyframes bloom-out {
+  0% { --r: 0px; opacity: 0; }
+  12% { opacity: 1; }
+  70% { opacity: 0.85; }
+  100% { --r: 115vmax; opacity: 0; }
+}
+
+/* A breeze: fine dust carried across the screen, left to right. */
+.breeze { position: fixed; inset: 0; pointer-events: none; z-index: 4; overflow: hidden; }
+.breeze span {
+  position: absolute; width: var(--size, 3px); height: var(--size, 3px); border-radius: 50%;
+  background: rgba(196, 164, 104, 0.85); opacity: 0;
+  animation: breeze linear forwards;
+}
+@keyframes breeze {
+  0% { opacity: 0; transform: translate(0, 0); }
+  15% { opacity: 0.9; }
+  80% { opacity: 0.6; }
+  100% { opacity: 0; transform: translate(85vw, var(--rise)); }
+}
+
+/* The stones lift one after another, like a breath. */
+.tile.wave .face { animation: stone-breath 0.9s var(--ease-out) var(--wave-delay, 0s) both; }
+@keyframes stone-breath { 0% { transform: none; } 35% { transform: translateY(-5px) scale(1.05); box-shadow: 0 1px 0 rgba(255, 255, 255, 0.85) inset, 0 12px 18px -8px rgba(var(--shadow), 0.4); } 100% { transform: none; } }
+
+/* The seal above the finishing word draws itself. */
+.seal { width: 36px; height: 36px; margin-bottom: 2px; }
+.seal path { fill: none; stroke-linejoin: round; stroke-dasharray: 1 1; stroke-dashoffset: 1; }
+.seal-outer { stroke: var(--indigo); stroke-width: 1.3; animation: seal-draw 1.2s var(--ease-out) 0.1s forwards; }
+.seal-inner { stroke: var(--brass); stroke-width: 1; animation: seal-draw 1s var(--ease-out) 0.6s forwards; }
+@keyframes seal-draw { to { stroke-dashoffset: 0; } }
+
+/* ------------------------------------------------------------ interlude */
+
+.interlude { position: fixed; inset: 0; z-index: 40; background: var(--limestone); }
+.il-scene { position: absolute; inset: 0; }
+.il-scene canvas { display: block; width: 100%; height: 100%; }
+.il-caption {
+  position: absolute; left: max(20px, env(safe-area-inset-left)); bottom: max(28px, env(safe-area-inset-bottom));
+  color: var(--chalk); text-shadow: 0 1px 8px rgba(38, 30, 22, 0.45); pointer-events: none;
+  animation: rise 1.4s var(--ease-out) 0.9s both;
+}
+.il-place { margin: 0; font-weight: 300; font-size: 1.6rem; letter-spacing: 0.08em; }
+.il-sub { margin: 2px 0 0; font-size: 0.78rem; letter-spacing: 0.22em; text-transform: uppercase; opacity: 0.9; }
+.il-skip {
+  position: absolute; top: max(14px, env(safe-area-inset-top)); right: 14px; min-height: 44px; padding: 0 18px;
+  border: 1px solid rgba(244, 239, 228, 0.5); border-radius: 22px; background: rgba(38, 30, 22, 0.25);
+  color: var(--chalk); letter-spacing: 0.08em; cursor: pointer;
+}
+.il-card {
+  position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  background: var(--limestone); opacity: 0; pointer-events: none; transition: opacity 0.6s var(--ease-out);
+}
+.il-title { margin: 0; font-weight: 300; font-size: clamp(1.6rem, 6vw, 2.4rem); letter-spacing: 0.06em; color: var(--ink); }
+.interlude.carding .il-card { opacity: 1; }
+.interlude.carding .il-skip, .interlude.carding .il-caption { display: none; }
+.interlude.leaving { opacity: 0; transition: opacity 0.8s var(--ease-out); pointer-events: none; }
 
 /* ------------------------------------------------------------- settings */
 
@@ -372,9 +488,11 @@ html.rm *, html.rm *::before, html.rm *::after { animation-duration: 0.001s !imp
 
 @media (min-width: 700px) {
   :root { --board: min(calc(100svh - 420px), 540px); }
+  .sheikh { width: 96px; height: 116px; }
   .play .hint-line { min-height: 1.6em; }
 }
 @media (max-height: 640px) {
-  .target-value { font-size: 1.8rem; }
-  .target-label { display: none; }
+  .sheikh { width: 62px; height: 75px; }
+  .speech { min-height: 72px; padding: 6px 12px 8px; }
+  .goal { width: 2.8rem; height: 2.8rem; }
 }

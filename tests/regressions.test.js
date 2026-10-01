@@ -7,7 +7,7 @@ import { solveLogically, findSolutions } from '../src/core/solver.js';
 import { givenValues } from '../src/core/puzzle.js';
 import { migrate, freshSave } from '../src/game/storage.js';
 import { Session, TRAY } from '../src/game/session.js';
-import { CHAPTERS } from '../src/game/levels.js';
+import { CHAPTERS, findLevel } from '../src/game/levels.js';
 import { endlessPuzzle, streakAlive } from '../src/game/daily.js';
 
 test('hints on deep 4x4 puzzles always end in a placement, and the placement is right', () => {
@@ -29,7 +29,8 @@ test('hints on deep 4x4 puzzles always end in a placement, and the placement is 
 });
 
 test('a clash between two stones blames the pair, not one innocent stone', () => {
-  const p = hydrate(CHAPTERS[0].puzzles[5]); // c1-06: the cross around a fixed 5
+  // The cross around a fixed 5 (was level c1-06, cut from the Journey 1 Oct 2026).
+  const p = hydrate({ v: 1, id: 'x-cross', kind: 'fill', n: 3, target: 15, rule: 'sum', cells: [1, 3, 4, 5, 7], lines: ['r1', 'c1'], givens: { 4: 5 }, pool: [1, 3, 7, 9] });
   const v = givenValues(p);
   v[1] = 1; // top middle
   v[3] = 9; // middle left
@@ -53,13 +54,13 @@ test('saves with bad fields fall back field by field', () => {
 });
 
 test('a saved stone in a space that does not exist is a corrupt save', () => {
-  const spec = CHAPTERS[0].puzzles[6];
+  const spec = findLevel('c1-07').spec;
   const s = new Session(spec);
   const bad = { ...s.toJSON(), pos: { t9: 99 } };
   assert.throws(() => Session.fromJSON(bad));
   const nan = { ...s.toJSON(), pos: { t9: 'abc' } };
   assert.throws(() => Session.fromJSON(nan));
-  const r = new Session(CHAPTERS[2].puzzles[0]);
+  const r = new Session(findLevel('l6-01').spec);
   const tray = { ...r.toJSON(), pos: { ...r.toJSON().pos, [r.tiles.find((t) => !t.locked).id]: TRAY } };
   assert.throws(() => Session.fromJSON(tray), 'restore stones never sit in the tray');
 });

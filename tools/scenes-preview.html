@@ -1,0 +1,87 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mizan scenes preview</title>
+<style>
+  body { margin: 0; background: #e6dcc8; color: #3a291d; font: 14px system-ui, sans-serif; }
+  .ui { padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: center; }
+  button { font: inherit; padding: 6px 12px; border: 1px solid #5b4733; background: #ece3d1; color: #3a291d; border-radius: 4px; cursor: pointer; }
+  button[aria-pressed="true"] { background: #34406b; color: #f4efe4; }
+  label { margin-left: 8px; }
+  .boxes { display: flex; flex-wrap: wrap; gap: 16px; padding: 0 16px 16px; align-items: flex-start; }
+  .box { position: relative; overflow: hidden; background: #e6dcc8; outline: 1px solid rgba(91, 71, 51, 0.3); }
+  .cap { padding: 6px 0 0; font-size: 12px; }
+  #log { padding: 0 16px; font-size: 12px; }
+  body.still { background: #fff; }
+  body.still .box { position: absolute; left: 0; top: 0; outline: none; }
+</style>
+</head>
+<body>
+<div id="app"></div>
+<div id="log"></div>
+<script type="module">
+  import { SCENES, mountScene } from '../src/ui/scenes.js';
+
+  const errors = [];
+  const log = document.getElementById('log');
+  const note = (msg) => { errors.push(msg); log.textContent = 'ERROR: ' + errors.join(' | '); document.title = 'ERROR'; };
+  window.addEventListener('error', (e) => note(e.message));
+  window.addEventListener('unhandledrejection', (e) => note(String(e.reason)));
+
+  const q = new URLSearchParams(location.search);
+  const app = document.getElementById('app');
+
+  if (q.has('scene')) {
+    // Still mode for deterministic screenshots: ?scene=<id>&t=<ms>[&w=390&h=700]
+    document.body.classList.add('still');
+    const t = Number(q.get('t') || 3500), w = Number(q.get('w') || 390), h = Number(q.get('h') || 700);
+    const box = document.createElement('div');
+    box.className = 'box'; box.style.width = w + 'px'; box.style.height = h + 'px';
+    app.appendChild(box);
+    try {
+      mountScene(box, q.get('scene'), { reduced: true, duration: t * 2 });
+      document.body.dataset.ready = '1';
+    } catch (e) { note(e.message); }
+  } else {
+    const ui = document.createElement('div'); ui.className = 'ui';
+    const boxes = document.createElement('div'); boxes.className = 'boxes';
+    app.append(ui, boxes);
+    const make = (w, h) => {
+      const wrap = document.createElement('div');
+      const box = document.createElement('div'); box.className = 'box';
+      box.style.width = w + 'px'; box.style.height = h + 'px';
+      const cap = document.createElement('div'); cap.className = 'cap'; cap.textContent = `${w} x ${h}`;
+      wrap.append(box, cap); boxes.appendChild(wrap);
+      return { box, cap, size: `${w} x ${h}` };
+    };
+    const targets = [make(390, 700), make(1280, 720)];
+    const reducedBox = document.createElement('input'); reducedBox.type = 'checkbox'; reducedBox.id = 'reduced';
+    const reducedLabel = document.createElement('label'); reducedLabel.htmlFor = 'reduced'; reducedLabel.textContent = ' reduced motion';
+    let handles = [];
+    const buttons = SCENES.map((sc) => {
+      const b = document.createElement('button');
+      b.textContent = sc.caption; b.setAttribute('aria-pressed', 'false');
+      b.onclick = () => play(sc, b);
+      ui.appendChild(b);
+      return b;
+    });
+    ui.append(reducedBox, reducedLabel);
+    function play(sc, btn) {
+      handles.forEach((hd) => hd.stop());
+      buttons.forEach((b) => b.setAttribute('aria-pressed', String(b === btn)));
+      const t0 = performance.now();
+      handles = targets.map((tg) => {
+        tg.cap.textContent = `${tg.size} - ${sc.caption}, ${sc.sub} - playing`;
+        return mountScene(tg.box, sc.id, {
+          reduced: reducedBox.checked,
+          onEnd: () => { tg.cap.textContent = `${tg.size} - ${sc.caption} - ended after ${Math.round(performance.now() - t0)} ms`; },
+        });
+      });
+    }
+    play(SCENES[0], buttons[0]);
+  }
+</script>
+</body>
+</html>

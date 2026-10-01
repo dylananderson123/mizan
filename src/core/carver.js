@@ -22,9 +22,10 @@ function fillSpec(id, n, solution, givenCells, meta) {
 // Remove givens one at a time in random order. Keep a removal only if the
 // puzzle stays unique and solvable within the band's hardest technique.
 // Retries with fresh orders until the rated band matches.
-export function carveFill(solution, n, rng, { band, id = 'gen', tries = 60, meta = {}, distractors = 0 } = {}) {
+export function carveFill(solution, n, rng, { band, id = 'gen', tries = 60, meta = {}, distractors = 0, gaps } = {}) {
   const maxTechnique = BAND_MAX_TECHNIQUE[band];
-  const maxRemoved = band === 1 ? 3 : Infinity;
+  // `gaps` caps how many stones are taken out, for a gentle step up in size.
+  const maxRemoved = gaps ?? (band === 1 ? 3 : Infinity);
   for (let t = 0; t < tries; t++) {
     let givenCells = Array.from({ length: n * n }, (_, i) => i);
     let removed = 0;

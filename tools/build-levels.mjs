@@ -14,10 +14,10 @@ import { carveFill, carveRestore } from '../src/core/carver.js';
 const normal = (n) => (rng) => randomMagicSquare(n, rng);
 const fresh = (rng) => randomLucasSquare(rng);
 
-function fill(id, make, n, band, inscription, distractors = 0) {
+function fill(id, make, n, band, inscription, distractors = 0, gaps) {
   for (let k = 0; k < 400; k++) {
     const rng = createRng(`${id}#${k}`);
-    const spec = carveFill(make(rng), n, rng, { band, id, meta: { inscription }, tries: 12, distractors });
+    const spec = carveFill(make(rng), n, rng, { band, id, meta: { inscription }, tries: 12, distractors, gaps });
     if (spec) return spec;
   }
   throw new Error(`Could not carve ${id} at band ${band}`);
@@ -33,30 +33,41 @@ function restore(id, make, n, swaps, locked, inscription) {
 }
 
 const t0 = Date.now();
+// Short levels of three puzzles, so the player climbs quickly. The board
+// reaches 4x4 at Level 5 (puzzle 13), and each level after it adds one
+// harder idea. Levels 1 to 3 are handcrafted in chapter1.js.
 const chapters = {
-  // Chapter II leaves 1..9 behind. Any nine numbers of Lucas's form make a
-  // square, and the target is always three times the centre. Learning the
-  // Lo Shu by heart no longer solves anything.
-  c2: [
-    fill('c2-01', fresh, 3, 1, 'Other numbers'),
-    fill('c2-02', fresh, 3, 2, 'Three times the centre'),
-    fill('c2-03', fresh, 3, 2, 'Locked stones'),
-    fill('c2-04', fresh, 3, 3, 'Only one fits'),
-    fill('c2-05', fresh, 3, 2, 'A stone too many', 1),
-    fill('c2-06', fresh, 3, 3, 'Two that do not belong', 2),
+  // Leaves 1..9 behind. Any nine numbers of Lucas's form make a square, and
+  // the target is always three times the centre. Recall no longer solves it.
+  l4: [
+    fill('l4-01', fresh, 3, 1, 'Other numbers'),
+    fill('l4-02', fresh, 3, 2, 'Three times the centre'),
+    fill('l4-03', fresh, 3, 3, 'Only one fits'),
   ],
-  c3: [
-    restore('c3-01', normal(3), 3, 1, 0, 'Restore the square'),
-    restore('c3-02', fresh, 3, 1, 3, 'Some stones hold'),
-    restore('c3-03', normal(3), 3, 2, 0, 'Two wrongs'),
-    restore('c3-04', fresh, 3, 2, 2, 'Patience'),
-    restore('c3-05', fresh, 3, 3, 1, 'Three wrongs'),
+  l5: [
+    fill('l5-01', normal(4), 4, 1, 'Thirty four'),
+    fill('l5-02', normal(4), 4, 2, 'Wider', 0, 5),
+    fill('l5-03', normal(4), 4, 2, 'Sixteen stones'),
   ],
-  c4: [
-    fill('c4-01', normal(4), 4, 1, 'Thirty four'),
-    fill('c4-02', normal(4), 4, 2, 'Wider'),
-    restore('c4-03', normal(4), 4, 1, 6, 'A broken sixteen'),
-    fill('c4-04', normal(4), 4, 3, 'Sixteen stones'),
+  l6: [
+    restore('l6-01', normal(3), 3, 1, 0, 'Restore the square'),
+    restore('l6-02', fresh, 3, 2, 2, 'Two wrongs'),
+    restore('l6-03', normal(4), 4, 1, 6, 'A broken sixteen'),
+  ],
+  l7: [
+    fill('l7-01', fresh, 3, 2, 'A stone too many', 1),
+    fill('l7-02', fresh, 3, 3, 'Two that do not belong', 2),
+    fill('l7-03', normal(4), 4, 3, 'One place left'),
+  ],
+  l8: [
+    fill('l8-01', normal(4), 4, 3, 'Patience'),
+    restore('l8-02', normal(4), 4, 2, 4, 'Two wrongs in sixteen'),
+    fill('l8-03', normal(4), 4, 4, 'Where lines cross'),
+  ],
+  l9: [
+    fill('l9-01', normal(4), 4, 4, 'Both must agree'),
+    restore('l9-02', normal(4), 4, 3, 2, 'Three wrongs'),
+    fill('l9-03', normal(4), 4, 5, 'Suppose'),
   ],
 };
 

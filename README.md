@@ -18,7 +18,7 @@ Then open http://127.0.0.1:8963 in Chrome.
 cd ~/code/mizan && npm test
 ```
 
-42 tests. One of them enumerates all 7,040 normal 4x4 magic squares, so the suite takes a few seconds.
+43 tests. One of them enumerates all 7,040 normal 4x4 magic squares, so the suite takes a few seconds.
 
 ## Rebuild the seeded levels
 

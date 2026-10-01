@@ -104,8 +104,129 @@ export const sfx = {
     tone(110.0, { dur: 3.6, gain: 0.05, attack: 0.06, delay: 0.08 });
     tone(146.83, { dur: 3.2, gain: 0.035, attack: 0.08, delay: 0.1 });
     tone(220.0, { dur: 2.4, gain: 0.012, attack: 0.1, delay: 0.12 });
+    // the breath of air: a swell of wind that opens upward
+    breath({ delay: 0.15, dur: 2.4, from: 380, to: 1900, gain: 0.05 });
+    // and a plucked phrase rising through the hijaz set on D
+    [293.66, 369.99, 440.0, 587.33].forEach((f, i) => pluck(f, { delay: 0.35 + i * 0.13, gain: 0.05 - i * 0.006 }));
+  },
+  // A whole level: the same, then a reed-flute line, then a fuller chord.
+  level() {
+    if (!settings.sound || !ensure()) return;
+    const line = [[440.0, 0.5], [392.0, 0.35], [369.99, 0.35], [392.0, 0.5], [293.66, 1.6]];
+    let t = 1.3;
+    for (const [f, d] of line) { ney(f, { delay: t, dur: d + 0.25 }); t += d; }
+    tone(73.42, { dur: 4.5, gain: 0.07, attack: 0.3, delay: t - 1.2 });
+    tone(146.83, { dur: 4, gain: 0.03, attack: 0.4, delay: t - 1.1 });
+    tone(220.0, { dur: 3.6, gain: 0.018, attack: 0.5, delay: t - 1 });
   },
 };
+
+// A plucked string: a bright attack that dulls as it rings. Upper partials
+// die faster than the fundamental, which is what makes it read as a string.
+function pluck(freq, { delay = 0, gain = 0.05 } = {}) {
+  tone(freq, { dur: 1.6, gain, attack: 0.003, type: 'triangle', delay });
+  tone(freq * 2, { dur: 0.6, gain: gain * 0.35, attack: 0.003, delay });
+  tone(freq * 3.01, { dur: 0.25, gain: gain * 0.18, attack: 0.002, delay });
+}
+
+// A reed flute: a breathy sine with a slow vibrato and a little noise.
+function ney(freq, { delay = 0, dur = 0.8, gain = 0.03 } = {}) {
+  const t = ctx.currentTime + delay;
+  const o = ctx.createOscillator();
+  o.frequency.value = freq;
+  const vib = ctx.createOscillator();
+  vib.frequency.value = 5.2;
+  const vg = ctx.createGain();
+  vg.gain.setValueAtTime(0, t);
+  vg.gain.linearRampToValueAtTime(freq * 0.008, t + dur * 0.6);
+  vib.connect(vg).connect(o.frequency);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + 0.12);
+  g.gain.setValueAtTime(gain, t + Math.max(0.13, dur - 0.2));
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  o.connect(g).connect(master);
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer(dur + 0.1);
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass'; f.frequency.value = freq * 2; f.Q.value = 6;
+  const ng = ctx.createGain();
+  ng.gain.setValueAtTime(0.0001, t);
+  ng.gain.exponentialRampToValueAtTime(gain * 0.5, t + 0.08);
+  ng.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(ng).connect(master);
+  for (const n of [o, vib, src]) { n.start(t); n.stop(t + dur + 0.1); }
+}
+
+// Moving air: filtered noise whose band sweeps from `from` to `to`.
+function breath({ delay = 0, dur = 2, from = 400, to = 1600, gain = 0.04 } = {}) {
+  const t = ctx.currentTime + delay;
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer(dur + 0.1, true);
+  const f = ctx.createBiquadFilter();
+  f.type = 'bandpass'; f.Q.value = 0.9;
+  f.frequency.setValueAtTime(from, t);
+  f.frequency.exponentialRampToValueAtTime(to, t + dur * 0.7);
+  const g = ctx.createGain();
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(gain, t + dur * 0.4);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dur);
+  src.connect(f).connect(g).connect(master);
+  src.start(t);
+  src.stop(t + dur + 0.1);
+}
+
+// The sound under a scenic interlude. Water for the coast, wind for inland,
+// a low drone on D under both. Returns a function that fades it out.
+const WATER = new Set(['sea', 'dhow', 'zanzibar']);
+export function sceneAmbience(id) {
+  if (!settings.sound || !ensure()) return () => {};
+  const t = ctx.currentTime;
+  const out = ctx.createGain();
+  out.gain.setValueAtTime(0.0001, t);
+  out.gain.exponentialRampToValueAtTime(1, t + 1.2);
+  out.connect(master);
+  const nodes = [];
+  const src = ctx.createBufferSource();
+  src.buffer = noiseBuffer(8, true);
+  src.loop = true;
+  const f = ctx.createBiquadFilter();
+  const g = ctx.createGain();
+  const lfo = ctx.createOscillator();
+  const lg = ctx.createGain();
+  if (WATER.has(id)) {
+    // swells: brown noise, lowpassed, its level rising and falling like waves
+    f.type = 'lowpass'; f.frequency.value = 650;
+    g.gain.value = 0.05;
+    lfo.frequency.value = 0.13; lg.gain.value = 0.04;
+  } else {
+    f.type = 'bandpass'; f.frequency.value = 520; f.Q.value = 0.7;
+    g.gain.value = 0.035;
+    lfo.frequency.value = 0.09; lg.gain.value = 0.025;
+  }
+  lfo.connect(lg).connect(g.gain);
+  src.connect(f).connect(g).connect(out);
+  nodes.push(src, lfo);
+  for (const [freq, gain] of [[73.42, 0.03], [110.0, 0.014], [146.83, 0.008]]) {
+    const o = ctx.createOscillator();
+    o.frequency.value = freq;
+    const og = ctx.createGain();
+    og.gain.value = gain;
+    o.connect(og).connect(out);
+    nodes.push(o);
+  }
+  for (const n of nodes) n.start(t);
+  let stopped = false;
+  return () => {
+    if (stopped) return;
+    stopped = true;
+    const now = ctx.currentTime;
+    out.gain.cancelScheduledValues(now);
+    out.gain.setValueAtTime(out.gain.value || 0.0001, now);
+    out.gain.exponentialRampToValueAtTime(0.0001, now + 0.9);
+    for (const n of nodes) n.stop(now + 1);
+  };
+}
 
 let windSrc = null;
 function syncAmbience() {

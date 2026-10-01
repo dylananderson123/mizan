@@ -76,19 +76,32 @@ Hints teach in three presses: where to look, what relationship holds, what follo
 
 ## 4. Progression
 
-| Chapter | Built | Teaches |
+Restructured 1 Oct 2026 `[Dylan]`: more levels, three puzzles each, so a player climbs fast; 4x4 much sooner; steeper difficulty. A "level" in the UI is what the code still calls a chapter (`CHAPTERS` in `src/game/levels.js`).
+
+| Level | Puzzles | Teaches |
 |---|---|---|
-| I The First Square | 10 handcrafted | One line makes 15; columns; one stone serves two lines; where lines cross both must agree; diagonals; opposites pair up; more than one answer can be right; the full square; the centre; a finale that needs the centre deduction |
-| II The Missing Tile | 6 seeded | New numbers, the target changes; three times the centre; locked stones; one candidate left; spare stones that belong nowhere |
-| III The Broken Square | 5 seeded | Swaps only; fewest swaps shown as diamonds; locked stones; one to three wrongs |
-| IV Thirty Four | 4 seeded | The board expands to 4x4, target 34; a broken sixteen |
-| V Other Rules | sealed | Semimagic, associative, prime, product, antimagic |
-| VI Beyond the Edge | sealed | Panmagic: lines that wrap |
-| VII New Forms | sealed | Hexagon, circles, matrices, networks |
+| 1 Fifteen | c1-01, c1-02, c1-03 | One line makes 15; columns; one stone serves two lines |
+| 2 Crossing Lines | c1-04, c1-05, c1-07 | Where lines cross both must agree; diagonals; the full square |
+| 3 The First Square | c1-08, c1-09, c1-10 | Fewer marks; the centre; the finale |
+| 4 Other Numbers | 3x3 Lucas, bands 1, 2, 3 | New numbers, a new total; three times the centre; one candidate left |
+| 5 Thirty Four | 4x4, 3 gaps, 5 gaps, 8 gaps | The board expands to 4x4 (puzzle 13; it was puzzle 22) |
+| 6 The Broken Square | restore 3x3 1 swap, 3x3 2 swaps, 4x4 1 swap | Swaps only |
+| 7 Spare Stones | 3x3 with 1 and 2 spare stones, 4x4 band 3 | Decide what belongs |
+| 8 Sixteen Stones | 4x4 band 3, 4x4 restore 2 swaps, 4x4 band 4 | Crossing lines on 4x4 |
+| 9 The Deep Square | 4x4 band 4, 4x4 restore 3 swaps, 4x4 band 5 | Suppose a stone and follow it |
+| 10 to 12 | sealed | Other Rules, Beyond the Edge, New Forms |
 
-Each chapter has its own emblem on the Journey screen: the same 4.8.8 tiling at a different Hankin angle. One piece of the emblem inks in per level finished. The finished emblems are the "library of patterns" the brief asks for.
+Cut: c1-06 "Opposites" (more than one answer is right). Its regression test keeps the spec inline.
 
-Modes: **Journey** (above). **Daily Square** opens after Chapter I: one moderate 3x3 on fresh numbers, the same for everyone on a given local date, with time, missteps, hints and a streak. **Endless**: 3x3, broken 3x3, or 4x4 (after Chapter IV), at a chosen depth. **Zen** is the default: there is no timer on screen unless switched on in settings.
+Between levels: a 7-second procedural film shot (`src/ui/scenes.js`), then the next level's name over its first puzzle. Scenes cycle in order: Nizwa, the Sea of Oman, a dhow, Stone Town, Wahiba Sands, Jebel Shams. Skip button and Escape end it early.
+
+The guide: a sheikh in a carved niche, upper right of the play screen (`src/ui/sheikh.js`). His speech holds the goal number in an indigo eight-point star, the teaching line, every hint, and the praise at the end. Dress taken from Dylan's reference (pale mint thobe, white turban, white scarf with black and grey stripes, brown skin, short grey beard). The face is simple and is not a likeness of anyone.
+
+The reward (`src/ui/reward.js`, `sfx.complete`, `sfx.level`): on top of the frame resolving, a band of the pattern travels out across the wall from the board, the stones lift one after another, a breeze of dust crosses the screen, a seal star draws itself. Sound adds a rising air swell and a plucked phrase on the hijaz set. A finished level adds a second indigo band and a short reed-flute line before a fuller chord.
+
+Each level has its own emblem on the Journey screen: the same 4.8.8 tiling at a different Hankin angle. One piece of the emblem inks in per level finished. The finished emblems are the "library of patterns" the brief asks for.
+
+Modes: **Journey** (above). **Daily Square** opens after Level 3: one moderate 3x3 on fresh numbers, the same for everyone on a given local date, with time, missteps, hints and a streak. **Endless**: 3x3, broken 3x3, or 4x4 (from Level 5), at a chosen depth. **Zen** is the default: there is no timer on screen unless switched on in settings.
 
 ---
 
@@ -162,13 +175,13 @@ Anything else (a guess, or more than one answer) gets no band and is never shipp
 | Brief item | State |
 |---|---|
 | Main menu | Built: title, Continue, Journey, Daily Square, Endless, settings |
-| Tutorial, 5 to 10 tiny puzzles | Built: Chapter I, 10 levels, one short line of text at most per new idea |
+| Tutorial, 5 to 10 tiny puzzles | Built: Levels 1 to 3, nine handcrafted puzzles, one short line from the guide per new idea |
 | 3x3 puzzle mode, several difficulties | Built: Endless 3x3 at three depths, broken 3x3 at one to three swaps |
 | Generator, validated | Built and tested |
 | Solver, verifies puzzles and solutions | Built and tested, two solvers |
 | Reasoning-aware hints | Built: three tiers from the logical solver |
 | Completion sequence | Built: lines ink in, connectors appear, colour turns, light shifts, dust, chord |
-| A chapter to complete | Built: four chapters, 25 levels |
+| A chapter to complete | Built: nine levels of three puzzles (27), scenic interludes between them |
 | Accessibility | Reduced motion, high contrast, text size, sound and wind switches, vibration switch, controls on either side, keyboard play, screen-reader announcements of every line total |
 | Save and resume | Built: versioned, tolerant of corrupt data |
 
